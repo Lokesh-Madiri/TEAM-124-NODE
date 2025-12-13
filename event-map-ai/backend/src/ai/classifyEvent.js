@@ -1,9 +1,43 @@
 // Enhanced AI event classification service
-// In a real implementation, this would use ML models or embeddings
+// Uses Gemini API for more sophisticated classification
+const geminiService = require('./geminiService');
 
 class EventClassifier {
   // Enhanced function to classify events into categories
   async classifyEvent(title, description) {
+    try {
+      // First try Gemini API for classification
+      const prompt = `
+        Classify the following event into one of these categories:
+        music, sports, workshop, exhibition, college fest, religious, promotion, other
+        
+        Title: ${title}
+        Description: ${description}
+        
+        Respond with only the category name in lowercase.
+      `;
+      
+      const response = await geminiService.generateResponse(prompt);
+      
+      // Validate response
+      const validCategories = ['music', 'sports', 'workshop', 'exhibition', 'college fest', 'religious', 'promotion', 'other'];
+      const category = response.trim().toLowerCase();
+      
+      if (validCategories.includes(category)) {
+        return category;
+      } else {
+        // Fallback to keyword-based classification
+        return this.keywordBasedClassification(title, description);
+      }
+    } catch (error) {
+      console.error('Gemini classification failed, falling back to keyword-based:', error);
+      // Fallback to keyword-based classification
+      return this.keywordBasedClassification(title, description);
+    }
+  }
+  
+  // Fallback keyword-based classification
+  keywordBasedClassification(title, description) {
     const text = (title + ' ' + description).toLowerCase();
     
     // Enhanced keyword-based classification with weights

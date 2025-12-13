@@ -16,6 +16,8 @@ app.use('/api/events', require('./routes/events'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/reviews', require('./routes/reviews'));
+app.use('/api/chat', require('./routes/chat'));
+app.use('/api/agents', require('./routes/agents'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -33,10 +35,18 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
+// Initialize AI services
+const retrievalService = require('./ai/retrievalService');
+const agentWorkflows = require('./ai/agentWorkflows');
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/eventmap')
-.then(() => {
+.then(async () => {
   console.log('Connected to MongoDB');
+  
+  // Initialize retrieval service
+  await retrievalService.initialize();
+  
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });

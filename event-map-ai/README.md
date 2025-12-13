@@ -58,6 +58,12 @@ A location-based event discovery platform with AI-powered features for deduplica
 - **JWT** - JSON Web Tokens for authentication
 - **Bcrypt.js** - Password hashing
 
+### AI & ML Services
+- **Gemini API** - Advanced AI capabilities for natural language processing
+- **ChromaDB** - Vector database for similarity search and RAG implementation
+- **Custom ML Models** - For event classification, moderation, and duplicate detection
+- **Embedding Services** - For semantic similarity and vector representations
+
 ## 📁 Project Structure
 
 ```
@@ -191,6 +197,15 @@ event-map-ai/
 - `GET /api/admin/users` - Get all users
 - `PUT /api/admin/update-user-role` - Update user role
 
+### AI Assistant & Agents
+- `POST /api/chat/message` - Send message to AI assistant
+- `POST /api/chat/stream` - Stream response from AI assistant
+- `GET /api/agents/search` - Search events using agent workflows
+- `POST /api/agents/duplicates` - Check for duplicate events
+- `POST /api/agents/moderate` - Moderate event content
+- `GET /api/agents/recommendations` - Get event recommendations
+- `POST /api/agents/approve/:eventId` - Approve/reject events (admin only)
+
 ## 🎯 User Roles & Permissions
 
 ### Regular User
@@ -219,6 +234,7 @@ Prevents duplicate events by analyzing:
 - Text similarity (title and description) using multiple algorithms
 - Geospatial proximity (within configurable distances)
 - Temporal closeness (within time windows)
+- Semantic similarity using embedding vectors
 - Weighted scoring system for accurate detection
 - Auto-rejection of high-similarity duplicates
 
@@ -228,6 +244,7 @@ Automatically categorizes events into:
 - College Fest, Religious, Promotion, Other
 - Confidence scoring for classification quality
 - Title-weighted analysis for better accuracy
+- Powered by Gemini API for advanced NLP
 
 ### Content Moderation
 Comprehensive content checking for:
@@ -237,6 +254,7 @@ Comprehensive content checking for:
 - Fake event detection
 - Formatting analysis (excessive caps, exclamation marks)
 - Risk scoring with detailed warnings
+- Powered by Gemini API for contextual understanding
 
 ### Auto Summarization
 Generates comprehensive event metadata:
@@ -245,6 +263,21 @@ Generates comprehensive event metadata:
 - Key highlight extraction
 - Relevant tag generation
 - Metadata including compression ratios
+- Powered by Gemini API for natural language understanding
+
+### RAG-Powered Search
+Enables intelligent event discovery:
+- Natural language queries processed through embedding service
+- Similarity search using ChromaDB vector database
+- Context injection into LLM prompts
+- Grounded responses based on real event data
+
+### Agent Workflows
+Implements specialized AI agents for:
+- Event search and ranking with geospatial awareness
+- Content moderation with contextual understanding
+- Duplicate detection with semantic similarity
+- Event recommendations based on user preferences
 
 ## 📱 Frontend Components
 
@@ -313,7 +346,9 @@ npm start
 5. **Social Features**: Event sharing and social login
 6. **Mobile App**: React Native mobile application
 7. **Analytics**: Event analytics dashboard
-8. **Real AI Integration**: OpenAI/GPT integration for advanced features
+8. **Multi-Agent Orchestration**: Advanced agent collaboration using MCP
+9. **Improved Personalization**: User preference learning and recommendation engines
+10. **Multimodal AI**: Image and text processing for richer event descriptions
 
 ## 🤝 Contributing
 

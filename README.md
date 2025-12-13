@@ -18,10 +18,12 @@ Event information is often scattered across multiple platforms and presented in 
 This project solves the problem by introducing:
 
 - A map-based event discovery system
-- An AI Event Assistant for conversational search
+- An AI Event Assistant for conversational search using RAG
 - Machine Learning for automatic event classification
 - RAG (Retrieval-Augmented Generation) to answer queries using real event data
 - Agent-based workflows for recommendations and moderation
+- Integration with Gemini API for advanced AI capabilities
+- ChromaDB vector database for efficient similarity search
 
 Together, these features create an intelligent and scalable event management platform.
 
@@ -66,26 +68,23 @@ Admin
 
 Frontend
 
-- React / Next.js
-- JavaScript or TypeScript
-- Leaflte API
+- React
+- JavaScript
+- Leaflet API for interactive maps
+- Vite for fast development
 
 Backend
 
-- Python (FastAPI or Django) OR Node.js (Express)
+- Node.js (Express)
+- MongoDB with Mongoose for data storage
+- MongoDB geospatial indexing for location-based queries
 
 AI and Machine Learning
 
-- Python
-- LangChain
-- ChromaDB (vector database)
-- Gemini API
-- Traditional ML models for classification
-
-Database
-
-- PostgreSQL
-- PostGIS for geolocation support
+- Gemini API for advanced AI capabilities
+- ChromaDB (vector database) for RAG implementation
+- Custom ML models for classification, moderation, and duplicate detection
+- Embedding services for semantic similarity
 
 Authentication
 
@@ -99,10 +98,12 @@ Authentication
 1. User accesses the web application
 2. Events are fetched from the backend and displayed on the map
 3. User queries the AI assistant
-4. Query embeddings are matched in ChromaDB
-5. Relevant event data is injected into the LLM (RAG)
-6. Agents handle search, ranking, or moderation tasks
-7. AI response is returned to the user
+4. Query is processed through embedding service
+5. Query embeddings are matched in ChromaDB for relevant event retrieval
+6. Retrieved event data is injected into the LLM prompt (RAG)
+7. Gemini API generates contextual response
+8. Agents handle search, ranking, duplicate detection, and moderation tasks
+9. AI response is returned to the user
 
 ---
 
@@ -120,21 +121,36 @@ Authentication
 
 Clone the repository
 
+```bash
 git clone https://github.com/Lokesh-Madiri/TEAM-124-NODE.git
-
 cd TEAM-124-NODE
+```
 
 Backend setup
 
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
+```bash
+cd event-map-ai/backend
+npm install
+```
 
 Frontend setup
 
-cd frontend
+```bash
+cd ../frontend
 npm install
-npm run dev
+```
+
+Environment Configuration
+
+Create a `.env` file in the `backend` directory:
+
+```
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/eventmap
+JWT_SECRET=your_jwt_secret_key
+GEMINI_API_KEY=your_gemini_api_key
+CHROMA_DB_URL=http://localhost:8000
+```
 
 ---
 
@@ -149,15 +165,23 @@ npm run dev
 
 ---
 
-## Configuration Detailss
+## Configuration Details
 
-Create a `.env` file and add:
+Create a `.env` file in the backend directory with the following variables:
 
-DATABASE_URL
-JWT_SECRET
-LLM_API_KEY (Gemini)
+```
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/eventmap
+JWT_SECRET=your_jwt_secret_key
+GEMINI_API_KEY=your_gemini_api_key
+CHROMA_DB_URL=http://localhost:8000
+```
 
-If using local LLMs, ensure they are downloaded before running the project.
+For the ChromaDB vector database, you can either:
+1. Run it locally with Docker: `docker run -p 8000:8000 chromadb/chroma`
+2. Use a hosted ChromaDB instance
+
+For the Gemini API, you'll need to obtain an API key from Google AI Studio.
 
 ---
 

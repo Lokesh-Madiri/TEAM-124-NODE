@@ -1,9 +1,76 @@
 // Enhanced AI duplicate detection service
-// In a real implementation, this would use embeddings to compare events
+// Uses embeddings for more sophisticated comparison
+const embeddingService = require('./embeddingService');
 
 class DuplicateChecker {
   // Enhanced function to check for duplicate events
   async checkForDuplicates(newEvent, existingEvents) {
+    try {
+      // Generate embeddings for the new event
+      const newEventText = `${newEvent.title} ${newEvent.description}`;
+      const newEventEmbedding = await embeddingService.generateEmbedding(newEventText);
+      
+      const duplicates = [];
+      
+      for (const event of existingEvents) {
+        // Generate embedding for existing event
+        const existingEventText = `${event.title} ${event.description}`;
+        const existingEventEmbedding = await embeddingService.generateEmbedding(existingEventText);
+        
+        // Calculate cosine similarity between embeddings
+        const embeddingSimilarity = this.cosineSimilarity(newEventEmbedding, existingEventEmbedding);
+        
+        // Calculate text similarity as backup
+        const titleSimilarity = this.calculateTextSimilarity(newEvent.title, event.title);
+        const descriptionSimilarity = this.calculateTextSimilarity(newEvent.description, event.description);
+        
+        // Check if events are close in location (within 1km)
+        const distance = this.calculateDistance(
+          newEvent.latitude, newEvent.longitude,
+          event.locationCoords.coordinates[1], event.locationCoords.coordinates[0]
+        );
+        
+        // Check if events are close in time (within 2 hours)
+        const timeDiff = Math.abs(new Date(newEvent.date) - new Date(event.date));
+        const timeClose = timeDiff <= 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+        
+        // Weighted similarity score (now with embedding similarity)
+        const weightedScore = (
+          embeddingSimilarity * 0.5 + // Higher weight for embedding similarity
+          titleSimilarity * 0.2 + 
+          descriptionSimilarity * 0.2 + 
+          (1 - distance/10) * 0.05 + // Normalize distance to 10km
+          (timeClose ? 0.05 : 0)
+        );
+        
+        // If high similarity, mark as duplicate candidate
+        if (weightedScore > 0.7) {
+          duplicates.push({
+            eventId: event._id,
+            title: event.title,
+            similarityScore: parseFloat(weightedScore.toFixed(3)),
+            embeddingSimilarity: parseFloat(embeddingSimilarity.toFixed(3)),
+            titleSimilarity: parseFloat(titleSimilarity.toFixed(3)),
+            descriptionSimilarity: parseFloat(descriptionSimilarity.toFixed(3)),
+            distance: parseFloat(distance.toFixed(2)),
+            timeDifference: timeDiff
+          });
+        }
+      }
+      
+      // Sort by similarity score (highest first)
+      duplicates.sort((a, b) => b.similarityScore - a.similarityScore);
+      
+      return duplicates;
+    } catch (error) {
+      console.error('Embedding-based duplicate detection failed, falling back to text-based:', error);
+      // Fallback to original text-based approach
+      return this.textBasedDuplicateCheck(newEvent, existingEvents);
+    }
+  }
+  
+  // Fallback text-based duplicate check
+  textBasedDuplicateCheck(newEvent, existingEvents) {
     const duplicates = [];
     
     for (const event of existingEvents) {
@@ -47,6 +114,28 @@ class DuplicateChecker {
     duplicates.sort((a, b) => b.similarityScore - a.similarityScore);
     
     return duplicates;
+  }
+  
+  // Cosine similarity for embeddings
+  cosineSimilarity(vec1, vec2) {
+    if (!vec1 || !vec2 || vec1.length !== vec2.length) return 0;
+    
+    let dotProduct = 0;
+    let magnitude1 = 0;
+    let magnitude2 = 0;
+    
+    for (let i = 0; i < vec1.length; i++) {
+      dotProduct += vec1[i] * vec2[i];
+      magnitude1 += vec1[i] * vec1[i];
+      magnitude2 += vec2[i] * vec2[i];
+    }
+    
+    magnitude1 = Math.sqrt(magnitude1);
+    magnitude2 = Math.sqrt(magnitude2);
+    
+    if (magnitude1 === 0 || magnitude2 === 0) return 0;
+    
+    return dotProduct / (magnitude1 * magnitude2);
   }
   
   // Enhanced text similarity using multiple techniques

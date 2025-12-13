@@ -1,9 +1,71 @@
 // Enhanced AI summarization service
-// In a real implementation, this would use NLP models to generate summaries
+// Uses Gemini API for more sophisticated summarization
+const geminiService = require('./geminiService');
 
 class EventSummarizer {
   // Enhanced function to generate event summaries
   async summarizeEvent(title, description) {
+    try {
+      // First try Gemini API for summarization
+      const prompt = `
+        Summarize the following event information:
+        
+        Title: ${title}
+        Description: ${description}
+        
+        Provide:
+        1. A short title (max 5 words)
+        2. A concise summary (max 20 words)
+        3. Key highlights (3 bullet points)
+        4. Relevant tags (5 tags)
+        
+        Respond with a JSON object with the exact structure:
+        {
+          "shortTitle": "string",
+          "summary": "string",
+          "highlights": ["string", "string", "string"],
+          "tags": ["string", "string", "string", "string", "string"]
+        }
+      `;
+      
+      const response = await geminiService.generateResponse(prompt);
+      
+      // Try to parse the response as JSON
+      try {
+        const result = JSON.parse(response);
+        
+        // Validate the structure
+        if (typeof result.shortTitle === 'string' &&
+            typeof result.summary === 'string' &&
+            Array.isArray(result.highlights) &&
+            Array.isArray(result.tags)) {
+          return {
+            shortTitle: result.shortTitle,
+            summary: result.summary,
+            highlights: result.highlights.slice(0, 3),
+            tags: result.tags.slice(0, 5),
+            metadata: {
+              originalTitleLength: title.split(' ').length,
+              originalDescriptionLength: description.split(' ').length,
+              summaryCompressionRatio: result.summary.split(' ').length / description.split(' ').length
+            }
+          };
+        }
+      } catch (parseError) {
+        console.error('Failed to parse Gemini summarization response:', parseError);
+      }
+      
+      // Fallback to rule-based summarization
+      return this.ruleBasedSummarization(title, description);
+    } catch (error) {
+      console.error('Gemini summarization failed, falling back to rule-based:', error);
+      // Fallback to rule-based summarization
+      return this.ruleBasedSummarization(title, description);
+    }
+  }
+  
+  // Fallback rule-based summarization
+  ruleBasedSummarization(title, description) {
     // Generate short title (max 5 words)
     const shortTitle = this.generateShortTitle(title);
     

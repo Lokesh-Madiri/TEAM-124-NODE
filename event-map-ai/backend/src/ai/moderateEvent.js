@@ -1,9 +1,68 @@
 // Enhanced AI moderation service
-// In a real implementation, this would use ML models to detect inappropriate content
+// Uses Gemini API for more sophisticated content moderation
+const geminiService = require('./geminiService');
 
 class EventModerator {
   // Enhanced function to moderate events for inappropriate content
   async moderateEvent(title, description) {
+    try {
+      // First try Gemini API for moderation
+      const prompt = `
+        Analyze the following event content for inappropriate content.
+        Look for: NSFW content, hate speech, discrimination, violence, threats, harassment, 
+        abuse, spam, scams, fraud, fake events, offensive language, insults.
+        
+        Title: ${title}
+        Description: ${description}
+        
+        Respond with a JSON object containing:
+        - riskScore: number between 0-1 indicating risk level
+        - warnings: array of warning objects with category, severity, and message
+        - isFlagged: boolean indicating if content should be flagged
+        - flaggedCategories: array of categories that triggered flags
+        
+        Example format:
+        {
+          "riskScore": 0.8,
+          "warnings": [{"category": "nsfw", "severity": "high", "message": "Contains explicit content"}],
+          "isFlagged": true,
+          "flaggedCategories": ["nsfw"]
+        }
+      `;
+      
+      const response = await geminiService.generateResponse(prompt);
+      
+      // Try to parse the response as JSON
+      try {
+        const result = JSON.parse(response);
+        
+        // Validate the structure
+        if (typeof result.riskScore === 'number' && 
+            Array.isArray(result.warnings) && 
+            typeof result.isFlagged === 'boolean' && 
+            Array.isArray(result.flaggedCategories)) {
+          return {
+            riskScore: Math.min(Math.max(result.riskScore, 0), 1), // Clamp between 0-1
+            warnings: result.warnings,
+            isFlagged: result.isFlagged,
+            flaggedCategories: result.flaggedCategories
+          };
+        }
+      } catch (parseError) {
+        console.error('Failed to parse Gemini moderation response:', parseError);
+      }
+      
+      // Fallback to keyword-based moderation
+      return this.keywordBasedModeration(title, description);
+    } catch (error) {
+      console.error('Gemini moderation failed, falling back to keyword-based:', error);
+      // Fallback to keyword-based moderation
+      return this.keywordBasedModeration(title, description);
+    }
+  }
+  
+  // Fallback keyword-based moderation
+  keywordBasedModeration(title, description) {
     const text = (title + ' ' + description).toLowerCase();
     
     // Enhanced keyword-based moderation with severity levels
