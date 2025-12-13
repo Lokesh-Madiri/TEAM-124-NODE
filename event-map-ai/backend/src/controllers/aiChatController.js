@@ -67,7 +67,7 @@ class AIChatController {
       const { category, location, dateRange, priceRange } = req.query;
 
       let query = {};
-      
+
       if (category) query.category = new RegExp(category, 'i');
       if (location) query.location = new RegExp(location, 'i');
       if (dateRange) {
@@ -124,6 +124,54 @@ class AIChatController {
       res.status(500).json({
         success: false,
         error: 'Failed to get analytics'
+      });
+    }
+  }
+
+  // Generate event description based on Q&A
+  async generateEventDescription(req, res) {
+    try {
+      const { title, type, audience, highlights } = req.body;
+
+      if (!title || !type) {
+        return res.status(400).json({
+          success: false,
+          error: 'Title and event type are required'
+        });
+      }
+
+      const prompt = `
+        Create a compelling and professional event description for an event with the following details:
+        
+        Event Title: ${title}
+        Event Type: ${type}
+        Target Audience: ${audience || 'General public'}
+        Key Highlights: ${highlights || 'Not specified'}
+        
+        The description should be engaging, informative, and encourage people to attend. 
+        Structure it with a catchy opening, detailed body, and a call to action.
+        Keep it under 300 words.
+      `;
+
+      // We can reuse the ragSystem's geminiService or import it directly if needed.
+      // Since AIChatController doesn't directly expose geminiService but RAGSystem does (or we can import it), 
+      // let's assume we can access it via a new import or just import it here.
+      // To keep it clean, I'll import GeminiService at the top of the file in the next step or assume it's available.
+      // Actually, looking at the code, I should import geminiService directly since it is a singleton.
+
+      const geminiService = require('../ai/geminiService');
+      const description = await geminiService.generateResponse(prompt);
+
+      res.json({
+        success: true,
+        description: description
+      });
+
+    } catch (error) {
+      console.error('Error generating event description:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate description'
       });
     }
   }

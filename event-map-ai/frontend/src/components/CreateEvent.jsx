@@ -23,18 +23,69 @@ export default function CreateEvent() {
     longitude: '',
     date: '',
     endDate: '',
-    category: 'other'
+    category: 'other',
+    photos: [] // Added for photo upload
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [mapCenter, setMapCenter] = useState([51.505, -0.09]);
+  const [mapCenter, setMapCenter] = useState([20.5937, 78.9629]); // Default to India center
   const [markerPosition, setMarkerPosition] = useState(null);
-  
+  const [useCurrentLocation, setUseCurrentLocation] = useState(true);
+  const [isDraggingMarker, setIsDraggingMarker] = useState(false);
+
+  // AI Generator State
+  const [showAiGenerator, setShowAiGenerator] = useState(false);
+  const [aiGenData, setAiGenData] = useState({
+    type: '',
+    audience: '',
+    highlights: ''
+  });
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleAiChange = (e) => {
+    const { name, value } = e.target;
+    setAiGenData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const generateDescription = async () => {
+    if (!eventData.title || !aiGenData.type) {
+      setError('Please provide at least a Title and Event Type for AI generation');
+      return;
+    }
+
+    setAiLoading(true);
+    setError('');
+
+    try {
+      const response = await eventService.generateDescription({
+        title: eventData.title,
+        type: aiGenData.type,
+        audience: aiGenData.audience,
+        highlights: aiGenData.highlights
+      }, token);
+
+      if (response.success) {
+        setEventData(prev => ({
+          ...prev,
+          description: response.description
+        }));
+        setShowAiGenerator(false);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to generate description');
+    }
+    setAiLoading(false);
+  };
+
   const { token, currentUser } = useAuth();
   const navigate = useNavigate();
   const mapRef = useRef(null);
+  const markerRef = useRef(null);
 
   // Initialize map center to user's location if available
   useEffect(() => {
@@ -42,18 +93,26 @@ export default function CreateEvent() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
+          console.log("User's actual location:", latitude, longitude);
           setMapCenter([latitude, longitude]);
-          setMarkerPosition([latitude, longitude]);
-          setEventData(prev => ({
-            ...prev,
-            latitude: latitude.toFixed(6),
-            longitude: longitude.toFixed(6)
-          }));
+          
+          // Set marker position and form data if using current location
+          if (useCurrentLocation) {
+            setMarkerPosition([latitude, longitude]);
+            setEventData(prev => ({
+              ...prev,
+              latitude: latitude.toFixed(6),
+              longitude: longitude.toFixed(6)
+            }));
+          }
         },
         (err) => {
           console.error("Error getting location:", err);
+          setError("Unable to get your precise location. Please select location manually on the map.");
         }
       );
+    } else {
+      setError("Geolocation is not supported by your browser. Please select location manually on the map.");
     }
   }, []);
 
@@ -65,34 +124,127 @@ export default function CreateEvent() {
     }));
   };
 
+  // Handle photo file selection
+  const handlePhotoChange = (e) => {
+    const files = Array.from(e.target.files);
+    setEventData(prev => ({
+      ...prev,
+      photos: [...prev.photos, ...files]
+    }));
+  };
+
+  // Remove a photo from the list
+  const removePhoto = (index) => {
+    setEventData(prev => {
+      const newPhotos = [...prev.photos];
+      newPhotos.splice(index, 1);
+      return { ...prev, photos: newPhotos };
+    });
+  };
+
   const handleMapClick = (e) => {
     const { lat, lng } = e.latlng;
     setMarkerPosition([lat, lng]);
+    
+    // Update form data when clicking on map
     setEventData(prev => ({
       ...prev,
       latitude: lat.toFixed(6),
       longitude: lng.toFixed(6)
     }));
+    
+    // Disable current location mode when manually selecting
+    setUseCurrentLocation(false);
+  };
+
+  // Enable marker dragging
+  const enableMarkerDrag = () => {
+    setIsDraggingMarker(true);
+  };
+
+  // Handle marker drag end
+  const handleMarkerDragEnd = (e) => {
+    const marker = e.target;
+    const position = marker.getLatLng();
+    
+    setMarkerPosition([position.lat, position.lng]);
+    setEventData(prev => ({
+      ...prev,
+      latitude: position.lat.toFixed(6),
+      longitude: position.lng.toFixed(6)
+    }));
+    
+    // Disable current location mode when manually dragging
+    setUseCurrentLocation(false);
+  };
+
+  const toggleUseCurrentLocation = () => {
+    const newUseCurrentLocation = !useCurrentLocation;
+    setUseCurrentLocation(newUseCurrentLocation);
+    
+    if (newUseCurrentLocation && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setMarkerPosition([latitude, longitude]);
+          setMapCenter([latitude, longitude]);
+          setEventData(prev => ({
+            ...prev,
+            latitude: latitude.toFixed(6),
+            longitude: longitude.toFixed(6)
+          }));
+        },
+        (err) => {
+          setError("Unable to get your current location: " + err.message);
+        }
+      );
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validate required fields
-    if (!eventData.title || !eventData.description || !eventData.location || 
-        !eventData.latitude || !eventData.longitude || !eventData.date) {
+    if (!eventData.title || !eventData.description || !eventData.location ||
+      !eventData.latitude || !eventData.longitude || !eventData.date) {
       setError('Please fill in all required fields');
       return;
     }
-    
+
     setLoading(true);
     setError('');
     setSuccess(false);
-    
+
     try {
-      const response = await eventService.createEvent(eventData, token);
-      setSuccess(true);
+      // Prepare form data for submission
+      const formData = new FormData();
+      Object.keys(eventData).forEach(key => {
+        if (key !== 'photos') {
+          // Ensure latitude and longitude are properly formatted
+          if (key === 'latitude' || key === 'longitude') {
+            formData.append(key, String(eventData[key]));
+          } else {
+            formData.append(key, eventData[key]);
+          }
+        }
+      });
       
+      // Append photos if any
+      if (eventData.photos && Array.isArray(eventData.photos)) {
+        eventData.photos.forEach(photo => {
+          formData.append('photos', photo);
+        });
+      }
+      
+      // Debugging: Log FormData contents
+      console.log("FormData contents:");
+      for (let [key, value] of formData.entries()) {
+        console.log(key, value);
+      }
+      
+      const response = await eventService.createEvent(formData, token);
+      setSuccess(true);
+
       // Reset form
       setEventData({
         title: '',
@@ -102,9 +254,10 @@ export default function CreateEvent() {
         longitude: '',
         date: '',
         endDate: '',
-        category: 'other'
+        category: 'other',
+        photos: []
       });
-      
+
       // Redirect to event page after short delay
       setTimeout(() => {
         navigate(`/event/${response.event._id}`);
@@ -112,7 +265,7 @@ export default function CreateEvent() {
     } catch (err) {
       setError(err.message || 'Failed to create event');
     }
-    
+
     setLoading(false);
   };
 
@@ -131,21 +284,46 @@ export default function CreateEvent() {
     <div className="create-event-container">
       <div className="create-event-card">
         <h2>Create New Event</h2>
-        
+
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">Event created successfully!</div>}
-        
+
         <div className="map-section">
           <h3>Select Event Location</h3>
-          <p>Click on the map to set the event location</p>
           
-          <MapContainer 
-            center={mapCenter} 
-            zoom={13} 
-            style={{ height: '300px', marginBottom: '20px' }}
+          <div className="location-options">
+            <div className="toggle-option">
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={useCurrentLocation}
+                  onChange={toggleUseCurrentLocation}
+                />
+                <span className="slider round"></span>
+              </label>
+              <span className="toggle-label">
+                {useCurrentLocation ? 'Using Current Location' : 'Set Manual Location'}
+              </span>
+            </div>
+            
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={enableMarkerDrag}
+              style={{ marginTop: '10px' }}
+            >
+              Drag Marker to Position
+            </button>
+          </div>
+
+          <p>Click on the map or drag the marker to set the event location</p>
+
+          <MapContainer
+            center={mapCenter}
+            zoom={6}
+            style={{ height: '400px', marginBottom: '20px' }}
             whenCreated={(map) => {
               mapRef.current = map;
-              map.on('click', handleMapClick);
             }}
           >
             <TileLayer
@@ -153,20 +331,28 @@ export default function CreateEvent() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             {markerPosition && (
-              <Marker position={markerPosition}>
-                <Popup>Event location</Popup>
+              <Marker 
+                position={markerPosition}
+                draggable={isDraggingMarker}
+                eventHandlers={{
+                  dragend: handleMarkerDragEnd,
+                  click: () => {}
+                }}
+                ref={markerRef}
+              >
+                <Popup>Event location. {isDraggingMarker ? 'Drag me to reposition' : 'Click and drag to move'}</Popup>
               </Marker>
             )}
           </MapContainer>
-          
+
           {markerPosition && (
             <p className="coordinates-display">
               Selected coordinates: {markerPosition[0].toFixed(6)}, {markerPosition[1].toFixed(6)}
             </p>
           )}
         </div>
-        
-        <form onSubmit={handleSubmit}>
+
+        <form onSubmit={handleSubmit} encType="multipart/form-data">
           <div className="form-group">
             <label htmlFor="title">Event Title *</label>
             <input
@@ -178,9 +364,69 @@ export default function CreateEvent() {
               required
             />
           </div>
-          
+
           <div className="form-group">
-            <label htmlFor="description">Description *</label>
+            <div className="label-with-action" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="description">Description *</label>
+              <button
+                type="button"
+                className="btn-text"
+                style={{ background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', fontWeight: 'bold' }}
+                onClick={() => setShowAiGenerator(!showAiGenerator)}
+              >
+                {showAiGenerator ? 'Cancel AI Generation' : '✨ Auto-Generate with AI'}
+              </button>
+            </div>
+
+            {showAiGenerator && (
+              <div className="ai-generator-panel" style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e9ecef' }}>
+                <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '10px' }}>
+                  Answer a few questions to generate a description.
+                </p>
+                <div className="form-group" style={{ marginBottom: '10px' }}>
+                  <label style={{ fontSize: '0.85rem', color: '#444' }}>Event Type *</label>
+                  <input
+                    type="text"
+                    name="type"
+                    value={aiGenData.type}
+                    onChange={handleAiChange}
+                    placeholder="e.g. Technology Conference, Music Festival"
+                    style={{ fontSize: '0.9rem', padding: '8px' }}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: '10px' }}>
+                  <label style={{ fontSize: '0.85rem', color: '#444' }}>Target Audience</label>
+                  <input
+                    type="text"
+                    name="audience"
+                    value={aiGenData.audience}
+                    onChange={handleAiChange}
+                    placeholder="e.g. Developers, Students, Families"
+                    style={{ fontSize: '0.9rem', padding: '8px' }}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: '10px' }}>
+                  <label style={{ fontSize: '0.85rem', color: '#444' }}>Key Highlights</label>
+                  <textarea
+                    name="highlights"
+                    value={aiGenData.highlights}
+                    onChange={handleAiChange}
+                    placeholder="e.g. Keynote speakers, Live demos, Free food"
+                    rows="2"
+                    style={{ fontSize: '0.9rem', padding: '8px' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ width: '100%', padding: '8px', fontSize: '0.9rem' }}
+                  onClick={generateDescription}
+                  disabled={aiLoading}
+                >
+                  {aiLoading ? 'Generating...' : 'Generate Description'}
+                </button>
+              </div>
+            )}
             <textarea
               id="description"
               name="description"
@@ -190,7 +436,7 @@ export default function CreateEvent() {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="location">Location *</label>
             <input
@@ -203,7 +449,7 @@ export default function CreateEvent() {
               required
             />
           </div>
-          
+
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="latitude">Latitude *</label>
@@ -214,11 +460,12 @@ export default function CreateEvent() {
                 value={eventData.latitude}
                 onChange={handleChange}
                 step="any"
-                placeholder="Click on map or enter manually"
+                placeholder="Click on map or drag marker"
                 required
+                readOnly={!useCurrentLocation}
               />
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="longitude">Longitude *</label>
               <input
@@ -228,12 +475,45 @@ export default function CreateEvent() {
                 value={eventData.longitude}
                 onChange={handleChange}
                 step="any"
-                placeholder="Click on map or enter manually"
+                placeholder="Click on map or drag marker"
                 required
+                readOnly={!useCurrentLocation}
               />
             </div>
           </div>
-          
+
+          {/* Photo Upload Section */}
+          <div className="form-group">
+            <label htmlFor="photos">Event Photos</label>
+            <input
+              type="file"
+              id="photos"
+              name="photos"
+              onChange={handlePhotoChange}
+              accept="image/*"
+              multiple
+            />
+            {eventData.photos.length > 0 && (
+              <div className="photo-preview">
+                <h4>Selected Photos ({eventData.photos.length})</h4>
+                <div className="photo-list">
+                  {eventData.photos.map((photo, index) => (
+                    <div key={index} className="photo-item">
+                      <span>{photo.name}</span>
+                      <button 
+                        type="button" 
+                        className="btn-remove-photo"
+                        onClick={() => removePhoto(index)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="form-group">
             <label htmlFor="date">Start Date & Time *</label>
             <input
@@ -245,7 +525,7 @@ export default function CreateEvent() {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="endDate">End Date & Time</label>
             <input
@@ -256,7 +536,7 @@ export default function CreateEvent() {
               onChange={handleChange}
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="category">Category</label>
             <select
@@ -275,9 +555,9 @@ export default function CreateEvent() {
               <option value="promotion">Promotion</option>
             </select>
           </div>
-          
-          <button 
-            type="submit" 
+
+          <button
+            type="submit"
             className="btn btn-primary btn-block"
             disabled={loading}
           >

@@ -51,37 +51,39 @@ export default function MapView() {
           setMapCenter(userPos);
           setMapZoom(14);
           setLoading(false);
+          
+          // Fetch all events (not just nearby ones)
+          fetchAllEvents();
         },
         (err) => {
           console.error("Error getting location:", err);
           setError("Unable to get your location. Showing default location.");
           setLoading(false);
+          
+          // Still fetch all events even if we can't get user location
+          fetchAllEvents();
         }
       );
     } else {
       setError("Geolocation is not supported by your browser. Showing default location.");
       setLoading(false);
+      
+      // Still fetch all events even if geolocation isn't supported
+      fetchAllEvents();
     }
   }, []);
 
-  // Fetch events and tasks near user's location
-  useEffect(() => {
-    if (userPosition) {
-      fetchEventsAndTasksNearUser();
-    }
-  }, [userPosition]);
-
-  const fetchEventsAndTasksNearUser = async () => {
+  const fetchAllEvents = async () => {
     try {
-      if (!userPosition) return;
-      
-      const [latitude, longitude] = userPosition;
-      const { events: eventsData, tasks: tasksData } = await eventService.getEventsAndTasks({ latitude, longitude });
+      // Fetch all events from the backend
+      const eventsData = await eventService.getEvents();
       setEvents(eventsData);
-      setTasks(tasksData);
     } catch (err) {
-      console.error("Error fetching events and tasks:", err);
-      setError("Failed to load events and tasks from server. Showing demo data.");
+      console.error("Error fetching events:", err);
+      setError("Failed to load events from server. Showing demo data.");
+      
+      // Fallback to static events if API fails
+      setEvents(eventService.getStaticEvents());
     }
   };
 
@@ -90,8 +92,8 @@ export default function MapView() {
     console.log("Map clicked at:", e.latlng);
   };
 
-  if (loading) {
-    return <div className="map-loading">Detecting your location...</div>;
+  if (loading && events.length === 0) {
+    return <div className="map-loading">Loading events...</div>;
   }
 
   return (
@@ -183,8 +185,9 @@ export default function MapView() {
       
       <div className="map-overlay">
         <div className="events-summary">
-          <h2>Nearby Items</h2>
-          <p>{events.length} events and {tasks.length} tasks {error ? "(demo mode)" : "within 10km"}</p>
+          <h2>Events</h2>
+          <p>{events.length} events loaded</p>
+          {error && <p>(Some data may be from demo mode)</p>}
         </div>
       </div>
     </div>

@@ -246,6 +246,7 @@ exports.getEventById = async (req, res) => {
         name: event.organizer.name,
         email: event.organizer.email,
       },
+      photos: event.photos || [], // Include photos in response
       createdAt: event.createdAt,
     };
 
@@ -258,6 +259,11 @@ exports.getEventById = async (req, res) => {
 
 exports.createEvent = async (req, res) => {
   try {
+    // When using FormData with multer, fields are in req.body
+    // Log the received data for debugging
+    console.log("Received body:", req.body);
+    console.log("Received files:", req.files);
+
     const {
       title,
       description,
@@ -269,6 +275,18 @@ exports.createEvent = async (req, res) => {
       category,
     } = req.body;
 
+    // Log individual fields for debugging
+    console.log("Fields:", {
+      title,
+      description,
+      location,
+      latitude,
+      longitude,
+      date,
+      endDate,
+      category,
+    });
+
     // Validate required fields
     if (
       !title ||
@@ -278,9 +296,52 @@ exports.createEvent = async (req, res) => {
       !longitude ||
       !date
     ) {
+      console.log("Missing required fields:", {
+        title: !!title,
+        description: !!description,
+        location: !!location,
+        latitude: !!latitude,
+        longitude: !!longitude,
+        date: !!date,
+      });
       return res
         .status(400)
         .json({ message: "Please provide all required fields" });
+    }
+
+    // Additional validation for latitude and longitude
+    const parsedLatitude = parseFloat(latitude);
+    const parsedLongitude = parseFloat(longitude);
+
+    if (isNaN(parsedLatitude) || isNaN(parsedLongitude)) {
+      console.log("Invalid latitude or longitude values:", {
+        latitude,
+        longitude,
+      });
+      return res
+        .status(400)
+        .json({ message: "Latitude and longitude must be valid numbers" });
+    }
+
+    // Validate latitude and longitude ranges
+    if (parsedLatitude < -90 || parsedLatitude > 90) {
+      console.log("Latitude out of range:", parsedLatitude);
+      return res
+        .status(400)
+        .json({ message: "Latitude must be between -90 and 90" });
+    }
+
+    if (parsedLongitude < -180 || parsedLongitude > 180) {
+      return res
+        .status(400)
+        .json({ message: "Longitude must be between -180 and 180" });
+    }
+
+    // Additional check for valid coordinate values
+    if (!isFinite(parsedLatitude) || !isFinite(parsedLongitude)) {
+      return res
+        .status(400)
+        .json({ message: "Latitude and longitude must be finite numbers" });
     }
 
     // Check if user is organizer or admin
@@ -316,7 +377,7 @@ exports.createEvent = async (req, res) => {
     );
 
     // Auto-reject if high-risk duplicate found
-    let status = "pending";
+    let status = "approved";
     let duplicateRisk = 0;
 
     if (duplicates.length > 0) {
@@ -336,6 +397,11 @@ exports.createEvent = async (req, res) => {
       status = "rejected";
     }
 
+    // Extract photo paths from uploaded files
+    const photoPaths = req.files
+      ? req.files.map((file) => `/uploads/${file.filename}`)
+      : [];
+
     // Create event
     const event = new Event({
       title,
@@ -343,13 +409,14 @@ exports.createEvent = async (req, res) => {
       location,
       locationCoords: {
         type: "Point",
-        coordinates: [parseFloat(longitude), parseFloat(latitude)],
+        coordinates: [parsedLongitude, parsedLatitude],
       },
       date: new Date(date),
       endDate: endDate ? new Date(endDate) : undefined,
       category: eventCategory,
       organizer: req.user._id,
       status,
+      photos: photoPaths, // Save photo paths
       aiFlags: {
         duplicateRisk,
         moderationWarnings: moderationResult.warnings.map((w) => w.message),
@@ -365,6 +432,10 @@ exports.createEvent = async (req, res) => {
     // Populate organizer info
     await savedEvent.populate("organizer", "name email");
 
+    console.log(
+      `Event created and saved to database: ${savedEvent._id} (${savedEvent.title})`
+    );
+
     res.status(201).json({
       message: "Event created successfully",
       event: {
@@ -378,6 +449,7 @@ exports.createEvent = async (req, res) => {
         endDate: savedEvent.endDate,
         category: savedEvent.category,
         status: savedEvent.status,
+        photos: savedEvent.photos || [], // Include photos in response
         organizer: {
           id: savedEvent.organizer._id,
           name: savedEvent.organizer.name,
@@ -431,9 +503,39 @@ exports.updateEvent = async (req, res) => {
     if (description) event.description = description;
     if (location) event.location = location;
     if (latitude && longitude) {
+      // Validate latitude and longitude
+      const parsedLatitude = parseFloat(latitude);
+      const parsedLongitude = parseFloat(longitude);
+
+      if (isNaN(parsedLatitude) || isNaN(parsedLongitude)) {
+        return res
+          .status(400)
+          .json({ message: "Latitude and longitude must be valid numbers" });
+      }
+
+      // Validate latitude and longitude ranges
+      if (parsedLatitude < -90 || parsedLatitude > 90) {
+        return res
+          .status(400)
+          .json({ message: "Latitude must be between -90 and 90" });
+      }
+
+      if (parsedLongitude < -180 || parsedLongitude > 180) {
+        return res
+          .status(400)
+          .json({ message: "Longitude must be between -180 and 180" });
+      }
+
+      // Additional check for valid coordinate values
+      if (!isFinite(parsedLatitude) || !isFinite(parsedLongitude)) {
+        return res
+          .status(400)
+          .json({ message: "Latitude and longitude must be finite numbers" });
+      }
+
       event.locationCoords = {
         type: "Point",
-        coordinates: [parseFloat(longitude), parseFloat(latitude)],
+        coordinates: [parsedLongitude, parsedLatitude],
       };
     }
     if (date) event.date = new Date(date);

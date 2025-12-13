@@ -8,6 +8,8 @@
     "dev": "nodemon src/server.js",
     "seed": "node src/utils/seedEvents.js",
     "test-ai": "node src/utils/testAI.js",
+    "fix-coordinates": "node utils/fixMissingCoordinates.js",
+    "migrate": "node utils/dataMigration.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -23,6 +25,7 @@
     "express-session": "^1.18.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.0.1",
+    "multer": "^2.0.2",
     "natural": "^8.1.0",
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",

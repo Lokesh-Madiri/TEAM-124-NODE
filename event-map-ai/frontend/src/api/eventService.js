@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:5001/api";
+const API_BASE_URL = "http://localhost:5000/api";
 
 class EventService {
   async getEvents(params = {}) {
@@ -33,15 +33,14 @@ class EventService {
     }
   }
 
-  async createEvent(eventData, token) {
+  async createEvent(formData, token) {
     try {
       const response = await fetch(`${API_BASE_URL}/events`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(eventData),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -74,6 +73,29 @@ class EventService {
       return await response.json();
     } catch (error) {
       console.error("Error updating attendance:", error);
+      throw error;
+    }
+  }
+
+  async generateDescription(data, token) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/generate-description`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate description");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error generating description:", error);
       throw error;
     }
   }

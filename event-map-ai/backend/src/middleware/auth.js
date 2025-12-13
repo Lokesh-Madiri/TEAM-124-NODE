@@ -18,8 +18,10 @@ const protect = async (req, res, next) => {
 
       next();
     } catch (error) {
-      console.error('Token verification error:', error);
-      return res.status(401).json({ message: 'Not authorized, token failed' });
+      console.error('Token verification error:', error.message);
+      console.log('Token that failed:', token ? token.substring(0, 20) + '...' : 'No token');
+      console.log('Using Secret:', process.env.JWT_SECRET ? 'From ENV' : 'Fallback');
+      return res.status(401).json({ message: 'Not authorized, token failed', error: error.message });
     }
   }
 

@@ -2,8 +2,13 @@ const express = require('express');
 const router = express.Router();
 const aiChatController = require('../controllers/aiChatController');
 
+const { protect, organizerOrAdmin } = require('../middleware/auth');
+
 // POST /api/ai/chat - Handle chat messages
 router.post('/chat', aiChatController.handleChatMessage.bind(aiChatController));
+
+// POST /api/ai/generate-description - Generate event description (Authenticated users)
+router.post('/generate-description', protect, aiChatController.generateEventDescription.bind(aiChatController));
 
 // GET /api/ai/suggestions - Get event suggestions
 router.get('/suggestions', aiChatController.getEventSuggestions.bind(aiChatController));

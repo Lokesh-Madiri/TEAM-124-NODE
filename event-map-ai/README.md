@@ -355,6 +355,34 @@ Implements specialized AI agents for:
 - Role-based registration
 - JWT token management
 
+## 🛠️ Data Migration Utilities
+
+To ensure data integrity and fix any inconsistencies in the database, we've added migration utilities:
+
+### Fix Missing Coordinates
+
+Fixes events that are missing the required `locationCoords` field:
+
+```bash
+cd backend
+npm run fix-coordinates
+```
+
+### Comprehensive Data Migration
+
+Runs all data integrity checks and fixes:
+
+```bash
+cd backend
+npm run migrate
+```
+
+This utility checks for and fixes:
+
+- Missing or invalid location coordinates
+- Invalid date formats
+- Missing event categories
+
 ## 🧪 Testing AI Services
 
 Run the AI services test suite:

@@ -1,76 +1,86 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const eventSchema = new mongoose.Schema({
   title: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
   },
   description: {
     type: String,
-    required: true
+    required: true,
   },
   location: {
     type: String,
-    required: true
+    required: true,
   },
   locationCoords: {
     type: {
       type: String,
-      enum: ['Point'],
-      required: true
+      enum: ["Point"],
+      required: true,
     },
     coordinates: {
       type: [Number],
-      index: '2dsphere',
-      required: true
-    }
+      index: "2dsphere",
+      required: true,
+    },
   },
   date: {
     type: Date,
-    required: true
+    required: true,
   },
   endDate: {
-    type: Date
+    type: Date,
   },
   category: {
     type: String,
-    required: true
+    required: true,
   },
   organizer: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: "User",
+    required: true,
   },
-  attendees: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
+  attendees: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
+    enum: ["pending", "approved", "rejected"],
+    default: "pending",
   },
   aiFlags: {
     duplicateRisk: {
       type: Number,
-      default: 0
+      default: 0,
     },
-    moderationWarnings: [{
-      type: String
-    }],
+    moderationWarnings: [
+      {
+        type: String,
+      },
+    ],
     riskScore: {
       type: Number,
-      default: 0
-    }
+      default: 0,
+    },
   },
+  // Added field for storing photo paths
+  photos: [
+    {
+      type: String,
+    },
+  ],
   createdAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
 // Create geospatial index
-eventSchema.index({ locationCoords: '2dsphere' });
+eventSchema.index({ locationCoords: "2dsphere" });
 
-module.exports = mongoose.model('Event', eventSchema);
+module.exports = mongoose.model("Event", eventSchema);
