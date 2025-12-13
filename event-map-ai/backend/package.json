@@ -11,6 +11,7 @@
     "fix-coordinates": "node utils/fixMissingCoordinates.js",
     "migrate": "node utils/dataMigration.js",
     "insert-sample": "node utils/insertSampleEvents.js",
+    "insert-local": "node utils/insertLocalEvents.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -383,6 +383,24 @@ This utility checks for and fixes:
 - Invalid date formats
 - Missing event categories
 
+### Insert Sample Events
+
+Inserts sample events into the database for testing:
+
+```bash
+cd backend
+npm run insert-sample
+```
+
+### Insert Local Events
+
+Inserts events near a specific location (18.151677, 83.373504) within a 10km radius with different categories:
+
+```bash
+cd backend
+npm run insert-local
+```
+
 ## 🧪 Testing AI Services
 
 Run the AI services test suite:
