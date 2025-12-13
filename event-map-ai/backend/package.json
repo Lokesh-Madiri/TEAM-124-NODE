@@ -29,6 +29,7 @@
     "mongoose": "^9.0.1",
     "multer": "^2.0.2",
     "natural": "^8.1.0",
+    "openai": "^6.10.0",
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0"
