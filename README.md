@@ -4,7 +4,7 @@
 The **AI-Powered Event Viewer Web Application** is a web-based platform that helps users discover, explore, and participate in events using an interactive map and AI-driven search.
 It combines **geospatial visualization**, **Machine Learning**, and **Generative AI** to make event discovery faster, smarter, and more intuitive for users, organizers, and administrators.
 
-This project represents a **Minimum Viable Product (MVP)** built for real-world usability and hackathon evaluation.
+This project represents a **Minimum Viable Product (MVP)** built for real-world usability .
 ---
 
 ## Problem Statement
