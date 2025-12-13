@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import eventService from '../api/eventService';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
 import './EventDetails.css';
+
+// Get API base URL from environment or default to localhost
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export default function EventDetails() {
   const { id } = useParams();
@@ -51,7 +56,7 @@ export default function EventDetails() {
     const fetchReviews = async () => {
       try {
         // Fetch event reviews
-        const response = await fetch(`http://localhost:5000/api/reviews/event/${id}`);
+        const response = await fetch(`${API_BASE_URL}/reviews/event/${id}`);
         if (response.ok) {
           const data = await response.json();
           setReviews(data.reviews);
@@ -67,7 +72,7 @@ export default function EventDetails() {
       if (!token) return;
       
       try {
-        const response = await fetch(`http://localhost:5000/api/reviews/event/${id}/user`, {
+        const response = await fetch(`${API_BASE_URL}/reviews/event/${id}/user`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -121,7 +126,7 @@ export default function EventDetails() {
     setReviewError('');
     
     try {
-      const response = await fetch(`http://localhost:5000/api/reviews/event/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/reviews/event/${id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,7 +142,7 @@ export default function EventDetails() {
         setReviewData({ rating: 5, comment: '' });
         
         // Refresh reviews
-        const reviewsResponse = await fetch(`http://localhost:5000/api/reviews/event/${id}`);
+        const reviewsResponse = await fetch(`${API_BASE_URL}/reviews/event/${id}`);
         if (reviewsResponse.ok) {
           const reviewsData = await reviewsResponse.json();
           setReviews(reviewsData.reviews);

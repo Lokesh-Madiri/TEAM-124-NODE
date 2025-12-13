@@ -43,24 +43,29 @@ app.use((err, req, res, next) => {
 const retrievalService = require("./ai/retrievalService");
 const agentWorkflows = require("./ai/agentWorkflows");
 
-// Connect to MongoDB with fallback
+// Connect to MongoDB - required for application to function
 mongoose
   .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/eventmap")
   .then(async () => {
-    console.log("Connected to MongoDB");
+    console.log("✅ Connected to MongoDB successfully");
 
     // Initialize retrieval service
     await retrievalService.initialize();
 
+    // Start server only after successful database connection
     app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+      console.log(`🚀 Server is running on port ${PORT}`);
+      console.log(`📡 API Endpoint: http://localhost:${PORT}/api`);
     });
   })
   .catch((err) => {
-    console.error("MongoDB connection error:", err);
-    console.log("Starting server without database connection...");
+    console.error("❌ Critical Error: Unable to connect to MongoDB");
+    console.error("📝 Error details:", err);
+    console.error(
+      "🔧 Please check your MongoDB connection string in .env file"
+    );
+    console.error("🛑 Application will not start without database connection");
 
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT} (without database)`);
-    });
+    // Exit the process since database is required
+    process.exit(1);
   });

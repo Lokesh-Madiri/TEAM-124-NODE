@@ -1,22 +1,36 @@
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 class EventService {
   async getEvents(params = {}) {
     try {
+      console.log("EventService: Fetching events with params:", params);
       const queryParams = new URLSearchParams(params).toString();
       const url = `${API_BASE_URL}/events${
         queryParams ? `?${queryParams}` : ""
       }`;
 
+      console.log("EventService: Making request to:", url);
       const response = await fetch(url);
+      console.log(
+        "EventService: Received response:",
+        response.status,
+        response.statusText
+      );
+
       if (!response.ok) {
-        throw new Error("Failed to fetch events");
+        throw new Error(
+          `Failed to fetch events: ${response.status} ${response.statusText}`
+        );
       }
-      return await response.json();
+
+      const data = await response.json();
+      console.log("EventService: Parsed", data.length, "events from response");
+      return data;
     } catch (error) {
-      console.error("Error fetching events:", error);
-      // Return static events when backend is unavailable
-      return this.getStaticEvents();
+      console.error("EventService: Error fetching events:", error);
+      // Throw error instead of returning static events
+      throw error;
     }
   }
 
@@ -100,120 +114,22 @@ class EventService {
     }
   }
 
-  // Static events for demonstration when backend is unavailable
-  getStaticEvents() {
-    return [
-      {
-        _id: "1",
-        title: "Tech Conference 2025",
-        description:
-          "Annual technology conference featuring the latest innovations and networking opportunities.",
-        location: "Convention Center, Downtown",
-        latitude: 51.5074,
-        longitude: -0.1278,
-        date: new Date().toISOString(),
-        category: "Technology",
-        attendees: 150,
-      },
-      {
-        _id: "2",
-        title: "Music Festival",
-        description:
-          "Three-day music festival with local and international artists.",
-        location: "Central Park",
-        latitude: 51.5034,
-        longitude: -0.1195,
-        date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-        category: "Music",
-        attendees: 850,
-      },
-      {
-        _id: "3",
-        title: "Art Workshop",
-        description:
-          "Hands-on workshop for beginners to learn watercolor painting techniques.",
-        location: "Community Arts Center",
-        latitude: 51.5136,
-        longitude: -0.1278,
-        date: new Date(Date.now() + 172800000).toISOString(), // In 2 days
-        category: "Workshop",
-        attendees: 25,
-      },
-    ];
-  }
-
   // Method to get both events and tasks
   async getEventsAndTasks(params = {}) {
     try {
       // Get events
       const events = await this.getEvents(params);
 
-      // Get tasks positioned near user
-      const tasks = this.getStaticTasksNearUser(
-        params.latitude,
-        params.longitude
-      );
+      // Get tasks from task service
+      const taskService = require("./taskService");
+      const tasks = await taskService.getTasks(params);
 
       return { events, tasks };
     } catch (error) {
       console.error("Error fetching events and tasks:", error);
-      return {
-        events: this.getStaticEvents(),
-        tasks: this.getStaticTasksNearUser(params.latitude, params.longitude),
-      };
+      // Throw error instead of returning static data
+      throw error;
     }
-  }
-
-  // Generate static tasks positioned near the user's location
-  getStaticTasksNearUser(userLat, userLon) {
-    // If no user location provided, use default London coordinates
-    const lat = userLat || 51.5074;
-    const lon = userLon || -0.1278;
-
-    // Generate tasks within a small radius of the user's location
-    return [
-      {
-        _id: "task1",
-        title: "Team Meeting",
-        description:
-          "Weekly team sync to discuss project progress and blockers.",
-        location: "Conference Room A",
-        latitude: lat + (Math.random() - 0.5) * 0.01, // Small offset from user location
-        longitude: lon + (Math.random() - 0.5) * 0.01,
-        date: new Date(Date.now() + 3600000).toISOString(), // In 1 hour
-        category: "Meeting",
-        attendees: 5,
-        priority: "high",
-        status: "pending",
-      },
-      {
-        _id: "task2",
-        title: "Code Review",
-        description: "Review pull requests for the new feature implementation.",
-        location: "Engineering Department",
-        latitude: lat + (Math.random() - 0.5) * 0.01,
-        longitude: lon + (Math.random() - 0.5) * 0.01,
-        date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-        category: "Development",
-        attendees: 2,
-        priority: "medium",
-        status: "pending",
-      },
-      {
-        _id: "task3",
-        title: "Client Presentation",
-        description:
-          "Present Q4 results and roadmap to key client stakeholders.",
-        location: "Executive Boardroom",
-        latitude: lat + (Math.random() - 0.5) * 0.01,
-        longitude: lon + (Math.random() - 0.5) * 0.01,
-        date: new Date(Date.now() + 172800000).toISOString(), // In 2 days
-        category: "Business",
-        attendees: 8,
-        priority: "high",
-        status: "pending",
-      },
-    ];
   }
 }
 
