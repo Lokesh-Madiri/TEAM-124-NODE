@@ -15,9 +15,10 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
     minlength: 6
   },
+  googleId: String,
+  facebookId: String,
   role: {
     type: String,
     enum: ['user', 'organizer', 'admin'],

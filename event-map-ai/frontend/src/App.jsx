@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import MapView from './components/MapView';
 import Login from './components/Login';
 import Register from './components/Register';
+import SocialCallback from './components/SocialCallback';
 import EventDetails from './components/EventDetails';
 import UserProfile from './components/UserProfile';
 import CreateEvent from './components/CreateEvent';
@@ -88,11 +89,12 @@ function App() {
             <Route path="/" element={<MapView />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/auth/social" element={<SocialCallback />} />
             <Route path="/event/:id" element={<EventDetails />} />
             <Route path="/profile" element={<UserProfile />} />
             <Route path="/create-event" element={<CreateEvent />} />
           </Routes>
-          
+
           {/* AI Event Bot - Available on all pages */}
           <AIEventBot events={events} />
         </div>

@@ -86,3 +86,25 @@ exports.login = async (req, res) => {
 exports.logout = (req, res) => {
   res.json({ message: 'Logged out successfully' });
 };
+
+exports.socialAuthCallback = (req, res) => {
+  const user = req.user;
+
+  // Generate JWT token
+  const token = jwt.sign(
+    { userId: user._id },
+    process.env.JWT_SECRET || 'fallback_secret_key',
+    { expiresIn: '7d' }
+  );
+
+  // Redirect to frontend with token
+  // Use HTTP ONLY cookie or query param (Query param is easier for client-side demo but less secure, good for now)
+  const userData = JSON.stringify({
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role
+  });
+
+  res.redirect(`http://localhost:5173/auth/social?token=${token}&user=${encodeURIComponent(userData)}`);
+};
