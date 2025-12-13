@@ -13,9 +13,27 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+// Custom icons for events and tasks
+const eventIcon = new L.Icon({
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  shadowSize: [41, 41]
+});
+
+const taskIcon = new L.Icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/1827/1827951.png', // Checklist icon
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -15],
+});
+
 export default function MapView() {
   const [userPosition, setUserPosition] = useState(null);
   const [events, setEvents] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [mapCenter, setMapCenter] = useState([51.505, -0.09]);
@@ -46,23 +64,24 @@ export default function MapView() {
     }
   }, []);
 
-  // Fetch events near user's location
+  // Fetch events and tasks near user's location
   useEffect(() => {
     if (userPosition) {
-      fetchEventsNearUser();
+      fetchEventsAndTasksNearUser();
     }
   }, [userPosition]);
 
-  const fetchEventsNearUser = async () => {
+  const fetchEventsAndTasksNearUser = async () => {
     try {
       if (!userPosition) return;
       
       const [latitude, longitude] = userPosition;
-      const eventsData = await eventService.getEvents({ latitude, longitude });
+      const { events: eventsData, tasks: tasksData } = await eventService.getEventsAndTasks({ latitude, longitude });
       setEvents(eventsData);
+      setTasks(tasksData);
     } catch (err) {
-      console.error("Error fetching events:", err);
-      setError("Failed to load events");
+      console.error("Error fetching events and tasks:", err);
+      setError("Failed to load events and tasks from server. Showing demo data.");
     }
   };
 
@@ -119,8 +138,9 @@ export default function MapView() {
         
         {events.map(event => (
           <Marker 
-            key={event._id} 
+            key={`event-${event._id}`} 
             position={[event.latitude, event.longitude]}
+            icon={eventIcon}
           >
             <Popup>
               <EventCard event={{
@@ -137,12 +157,34 @@ export default function MapView() {
             </Popup>
           </Marker>
         ))}
+
+        {tasks.map(task => (
+          <Marker 
+            key={`task-${task._id}`} 
+            position={[task.latitude, task.longitude]}
+            icon={taskIcon}
+          >
+            <Popup>
+              <div className="task-card">
+                <h3>{task.title}</h3>
+                <p><strong>Description:</strong> {task.description}</p>
+                <p><strong>Location:</strong> {task.location}</p>
+                <p><strong>Date:</strong> {new Date(task.date).toLocaleString()}</p>
+                <p><strong>Category:</strong> {task.category}</p>
+                <p><strong>Priority:</strong> 
+                  <span className={`priority-${task.priority}`}> {task.priority}</span>
+                </p>
+                <p><strong>Attendees:</strong> {task.attendees}</p>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
       
       <div className="map-overlay">
         <div className="events-summary">
-          <h2>Nearby Events</h2>
-          <p>{events.length} events within 10km</p>
+          <h2>Nearby Items</h2>
+          <p>{events.length} events and {tasks.length} tasks {error ? "(demo mode)" : "within 10km"}</p>
         </div>
       </div>
     </div>

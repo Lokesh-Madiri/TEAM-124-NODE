@@ -5,12 +5,14 @@ A location-based event discovery platform with AI-powered features for deduplica
 ## ✨ Key Features Implemented
 
 ### 🗺️ Real-Time Location Detection
+
 - Automatic detection of user's current location (with permission)
 - Shows events within a 10km radius
 - Visualizes user's location on the map
 - Interactive map click for event creation
 
 ### 🎯 Event Discovery & Management
+
 - Interactive map with event markers using Leaflet and OpenStreetMap
 - Detailed event information with reviews and ratings
 - Event creation for organizers with map coordinate selection
@@ -18,24 +20,28 @@ A location-based event discovery platform with AI-powered features for deduplica
 - Google Maps integration for directions
 
 ### 🔐 Role-Based Authentication System
+
 - **Users**: Browse, attend events, and review events
 - **Organizers**: Create and manage events
 - **Admins**: Moderate and approve events
 - JWT-based secure authentication
 
 ### 🤖 AI-Powered Services
+
 - **Duplicate Detection**: Prevents duplicate events using advanced similarity algorithms
 - **Event Classification**: Auto-categorizes events with confidence scoring
 - **Content Moderation**: Checks for NSFW, spam, and abusive content with severity levels
 - **Auto Summarization**: Generates event summaries, highlights, and tags
 
 ### 📋 Event Lifecycle Management
+
 - Event submission workflow with approval process
 - Pending/Approved/Rejected event statuses
 - Organizer dashboard for managing events
 - Admin panel for moderation and approvals
 
 ### ⭐ Review & Rating System
+
 - Star ratings (1-5 stars)
 - Written reviews
 - Average rating display
@@ -44,6 +50,7 @@ A location-based event discovery platform with AI-powered features for deduplica
 ## 🏗️ Tech Stack
 
 ### Frontend
+
 - **React** - JavaScript library for building user interfaces
 - **Vite** - Fast build tool and development server
 - **Leaflet** - Interactive maps
@@ -51,6 +58,7 @@ A location-based event discovery platform with AI-powered features for deduplica
 - **CSS Modules** - Scoped styling
 
 ### Backend
+
 - **Node.js** - JavaScript runtime
 - **Express** - Web application framework
 - **MongoDB** - NoSQL database with geospatial indexing
@@ -59,6 +67,7 @@ A location-based event discovery platform with AI-powered features for deduplica
 - **Bcrypt.js** - Password hashing
 
 ### AI & ML Services
+
 - **Gemini API** - Advanced AI capabilities for natural language processing
 - **ChromaDB** - Vector database for similarity search and RAG implementation
 - **Custom ML Models** - For event classification, moderation, and duplicate detection
@@ -93,24 +102,28 @@ event-map-ai/
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - Node.js (v14 or higher)
-- MongoDB (local or cloud instance)
+- MongoDB (local or cloud instance) - Optional for basic functionality
 
 ### Installation
 
 1. **Clone the repository:**
+
    ```bash
    git clone <repository-url>
    cd event-map-ai
    ```
 
 2. **Install backend dependencies:**
+
    ```bash
    cd backend
    npm install
    ```
 
 3. **Install frontend dependencies:**
+
    ```bash
    cd ../frontend
    npm install
@@ -126,24 +139,28 @@ event-map-ai/
 
 ### Running the Application
 
-1. **Start MongoDB** (if using local instance):
-   ```bash
-   sudo systemctl start mongod
-   ```
+1. **Start the backend server:**
 
-2. **Start the backend server:**
    ```bash
    cd backend
    npm run dev
    ```
 
-3. **Start the frontend development server:**
+2. **Start the frontend development server:**
+
    ```bash
    cd frontend
    npm run dev
    ```
 
+3. **Alternative: Use the PowerShell script (Windows only):**
+
+   ```powershell
+   ./start.ps1
+   ```
+
 4. **Seed initial data (optional):**
+
    ```bash
    cd backend
    npm run seed
@@ -156,17 +173,20 @@ event-map-ai/
    ```
 
 ### Access the Application
-- **Frontend:** http://localhost:5173
-- **Backend API:** http://localhost:5000
+
+- **Frontend:** http://localhost:5174
+- **Backend API:** http://localhost:5001
 
 ## 🛠️ API Endpoints
 
 ### Authentication
+
 - `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - User login
 - `POST /api/auth/logout` - User logout
 
 ### Events
+
 - `GET /api/events` - Get events (with location filtering)
 - `GET /api/events/:id` - Get event by ID
 - `POST /api/events` - Create new event (organizer/admin only)
@@ -177,6 +197,7 @@ event-map-ai/
 - `GET /api/events/attending` - Get events user is attending
 
 ### Reviews
+
 - `GET /api/reviews/event/:eventId` - Get reviews for an event
 - `POST /api/reviews/event/:eventId` - Create review (authenticated users)
 - `GET /api/reviews/event/:eventId/user` - Get user's review for event
@@ -184,12 +205,14 @@ event-map-ai/
 - `DELETE /api/reviews/:reviewId` - Delete review (owner or admin)
 
 ### Users
+
 - `GET /api/users/profile` - Get user profile
 - `PUT /api/users/profile` - Update user profile
 - `PUT /api/users/change-password` - Change password
 - `POST /api/users/register-organizer` - Register as organizer
 
 ### Admin
+
 - `GET /api/admin/pending-events` - Get pending events
 - `POST /api/admin/review-event` - Approve/reject event
 - `GET /api/admin/flagged-events` - Get AI-flagged events
@@ -198,6 +221,7 @@ event-map-ai/
 - `PUT /api/admin/update-user-role` - Update user role
 
 ### AI Assistant & Agents
+
 - `POST /api/chat/message` - Send message to AI assistant
 - `POST /api/chat/stream` - Stream response from AI assistant
 - `GET /api/agents/search` - Search events using agent workflows
@@ -209,18 +233,21 @@ event-map-ai/
 ## 🎯 User Roles & Permissions
 
 ### Regular User
+
 - View approved events
 - Attend/cancel attendance
 - Write reviews and ratings
 - View own profile
 
 ### Event Organizer
+
 - All user permissions
 - Create events with interactive map click
 - Edit/delete own events
 - View event attendance
 
 ### Administrator
+
 - All organizer permissions
 - Approve/reject events
 - Moderate content
@@ -230,7 +257,9 @@ event-map-ai/
 ## 🤖 AI Services Deep Dive
 
 ### Duplicate Detection
+
 Prevents duplicate events by analyzing:
+
 - Text similarity (title and description) using multiple algorithms
 - Geospatial proximity (within configurable distances)
 - Temporal closeness (within time windows)
@@ -239,7 +268,9 @@ Prevents duplicate events by analyzing:
 - Auto-rejection of high-similarity duplicates
 
 ### Event Classification
+
 Automatically categorizes events into:
+
 - Music, Sports, Workshop, Exhibition
 - College Fest, Religious, Promotion, Other
 - Confidence scoring for classification quality
@@ -247,7 +278,9 @@ Automatically categorizes events into:
 - Powered by Gemini API for advanced NLP
 
 ### Content Moderation
+
 Comprehensive content checking for:
+
 - NSFW content with severity levels
 - Abusive/hateful language detection
 - Spam/marketing content identification
@@ -257,7 +290,9 @@ Comprehensive content checking for:
 - Powered by Gemini API for contextual understanding
 
 ### Auto Summarization
+
 Generates comprehensive event metadata:
+
 - Short titles (max 5 words)
 - Concise summaries (max 20 words)
 - Key highlight extraction
@@ -266,14 +301,18 @@ Generates comprehensive event metadata:
 - Powered by Gemini API for natural language understanding
 
 ### RAG-Powered Search
+
 Enables intelligent event discovery:
+
 - Natural language queries processed through embedding service
 - Similarity search using ChromaDB vector database
 - Context injection into LLM prompts
 - Grounded responses based on real event data
 
 ### Agent Workflows
+
 Implements specialized AI agents for:
+
 - Event search and ranking with geospatial awareness
 - Content moderation with contextual understanding
 - Duplicate detection with semantic similarity
@@ -282,12 +321,14 @@ Implements specialized AI agents for:
 ## 📱 Frontend Components
 
 ### MapView
+
 - Main map interface with geolocation
 - Event markers with popups
 - 10km radius visualization
 - User location detection
 
 ### EventDetails
+
 - Detailed event information
 - Attendance functionality
 - Google Maps directions
@@ -295,18 +336,21 @@ Implements specialized AI agents for:
 - Community reviews display
 
 ### UserProfile
+
 - User information
 - Organized events
 - Attending events
 - Account settings
 
 ### CreateEvent
+
 - Event creation form
 - Interactive map click for location selection
 - Coordinate auto-fill
 - Date/time selection
 
 ### Authentication
+
 - Login and registration forms
 - Role-based registration
 - JWT token management
@@ -314,6 +358,7 @@ Implements specialized AI agents for:
 ## 🧪 Testing AI Services
 
 Run the AI services test suite:
+
 ```bash
 cd backend
 npm run test-ai
@@ -324,14 +369,18 @@ This will test all AI services with sample data and show detailed results.
 ## 🚢 Deployment
 
 ### Frontend
+
 Build for production:
+
 ```bash
 cd frontend
 npm run build
 ```
 
 ### Backend
+
 Start in production mode:
+
 ```bash
 cd backend
 npm start
