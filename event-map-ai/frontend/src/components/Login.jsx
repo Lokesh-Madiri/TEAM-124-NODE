@@ -44,6 +44,37 @@ export default function Login() {
 
   return (
     <div className="auth-container">
+      {/* 3D DNA Helix Animations */}
+      <div className="dna-helix">
+        <div className="dna-strand"></div>
+        <div className="dna-strand"></div>
+        <div className="dna-base" style={{top: '10%'}}></div>
+        <div className="dna-base" style={{top: '25%'}}></div>
+        <div className="dna-base" style={{top: '40%'}}></div>
+        <div className="dna-base" style={{top: '55%'}}></div>
+        <div className="dna-base" style={{top: '70%'}}></div>
+        <div className="dna-base" style={{top: '85%'}}></div>
+      </div>
+      
+      <div className="dna-helix">
+        <div className="dna-strand"></div>
+        <div className="dna-strand"></div>
+        <div className="dna-base" style={{top: '15%'}}></div>
+        <div className="dna-base" style={{top: '30%'}}></div>
+        <div className="dna-base" style={{top: '45%'}}></div>
+        <div className="dna-base" style={{top: '60%'}}></div>
+        <div className="dna-base" style={{top: '75%'}}></div>
+      </div>
+      
+      <div className="dna-helix">
+        <div className="dna-strand"></div>
+        <div className="dna-strand"></div>
+        <div className="dna-base" style={{top: '20%'}}></div>
+        <div className="dna-base" style={{top: '40%'}}></div>
+        <div className="dna-base" style={{top: '60%'}}></div>
+        <div className="dna-base" style={{top: '80%'}}></div>
+      </div>
+      
       <div className="auth-card">
         <h2>Welcome Back</h2>
         <p>Sign in to your account</p>

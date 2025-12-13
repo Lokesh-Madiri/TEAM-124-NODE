@@ -7,10 +7,78 @@ import EventDetails from './components/EventDetails';
 import UserProfile from './components/UserProfile';
 import CreateEvent from './components/CreateEvent';
 import Navigation from './components/Navigation';
+import AIEventBot from './components/AIEventBot';
 import AuthProvider from './context/AuthContext';
 import './App.css';
 
 function App() {
+  const [events, setEvents] = useState([]);
+
+  // Fetch events data for the AI bot
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        // Replace with your actual API endpoint
+        const response = await fetch('/api/events');
+        if (response.ok) {
+          const eventsData = await response.json();
+          setEvents(eventsData);
+        } else {
+          // Fallback sample data for demonstration
+          setEvents([
+            {
+              id: 1,
+              title: "Tech Conference 2024",
+              description: "Annual technology conference featuring latest innovations",
+              location: "Downtown Convention Center",
+              date: "2024-03-15",
+              time: "9:00 AM",
+              category: "Technology",
+              price: 150
+            },
+            {
+              id: 2,
+              title: "Music Festival",
+              description: "Three-day music festival with top artists",
+              location: "Central Park",
+              date: "2024-03-20",
+              time: "6:00 PM",
+              category: "Music",
+              price: 75
+            },
+            {
+              id: 3,
+              title: "Food & Wine Expo",
+              description: "Culinary experience with local chefs and wineries",
+              location: "Riverside Plaza",
+              date: "2024-03-25",
+              time: "12:00 PM",
+              category: "Food",
+              price: 45
+            }
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching events:', error);
+        // Use sample data as fallback
+        setEvents([
+          {
+            id: 1,
+            title: "Tech Conference 2024",
+            description: "Annual technology conference featuring latest innovations",
+            location: "Downtown Convention Center",
+            date: "2024-03-15",
+            time: "9:00 AM",
+            category: "Technology",
+            price: 150
+          }
+        ]);
+      }
+    };
+
+    fetchEvents();
+  }, []);
+
   return (
     <AuthProvider>
       <Router>
@@ -24,6 +92,9 @@ function App() {
             <Route path="/profile" element={<UserProfile />} />
             <Route path="/create-event" element={<CreateEvent />} />
           </Routes>
+          
+          {/* AI Event Bot - Available on all pages */}
+          <AIEventBot events={events} />
         </div>
       </Router>
     </AuthProvider>

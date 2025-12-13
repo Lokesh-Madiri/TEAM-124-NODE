@@ -201,6 +201,6 @@ Future Scope
 - Real-time notifications
 - Event reviews and ratings
 - Improved guardrails and evaluations
-- Virtual and hybrid event support
+- Viirtual and hybrid event support
 
 ---

@@ -18,6 +18,7 @@ app.use("/api/admin", require("./routes/admin"));
 app.use("/api/reviews", require("./routes/reviews"));
 app.use("/api/chat", require("./routes/chat"));
 app.use("/api/agents", require("./routes/agents"));
+app.use("/api/ai", require("./routes/aiChat"));
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
