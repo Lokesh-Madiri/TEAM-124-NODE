@@ -149,7 +149,7 @@ npm run dev
 
 ---
 
-## Configuration Details
+## Configuration Detailss
 
 Create a `.env` file and add:
 
