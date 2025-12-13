@@ -73,17 +73,39 @@ export default function MapView() {
     }
   }, []);
 
-  const fetchAllEvents = async () => {
+  const fetchAllEvents = async (position = null) => {
     try {
-      // Fetch all events from the backend
-      const eventsData = await eventService.getEvents();
+      // Prepare parameters for fetching events
+      const params = {};
+      
+      // If we have user position, include it in the request
+      if (position) {
+        params.latitude = position[0];
+        params.longitude = position[1];
+        params.radius = 100; // Increase radius to capture more events
+        console.log("Fetching events with user position:", position);
+      } else if (userPosition) {
+        // Fallback to existing userPosition state
+        params.latitude = userPosition[0];
+        params.longitude = userPosition[1];
+        params.radius = 100;
+        console.log("Fetching events with existing user position:", userPosition);
+      } else {
+        console.log("Fetching all events (no user position available)");
+      }
+      
+      console.log("Event fetch parameters:", params);
+      
+      // Fetch events from the backend with location parameters
+      const eventsData = await eventService.getEvents(params);
+      console.log("Received", eventsData.length, "events from backend:", eventsData);
       setEvents(eventsData);
     } catch (err) {
       console.error("Error fetching events:", err);
-      setError("Failed to load events from server. Showing demo data.");
+      setError("Failed to load events from server. Please try again later.");
       
-      // Fallback to static events if API fails
-      setEvents(eventService.getStaticEvents());
+      // Clear events on error instead of showing static events
+      setEvents([]);
     }
   };
 

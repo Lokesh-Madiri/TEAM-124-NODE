@@ -112,10 +112,10 @@ export default function Login() {
         <div className="social-login">
           <p className="divider-text">Or continue with</p>
           <div className="social-buttons">
-            <a href="http://localhost:5000/api/auth/google" className="btn btn-google btn-block">
+            <a href="/api/auth/google" className="btn btn-google btn-block">
               Login with Google
             </a>
-            <a href="http://localhost:5000/api/auth/facebook" className="btn btn-facebook btn-block">
+            <a href="/api/auth/facebook" className="btn btn-facebook btn-block">
               Login with Facebook
             </a>
           </div>

@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './ChatAssistant.css';
 
+// Get API base URL from environment or default to localhost
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
 const ChatAssistant = () => {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
@@ -33,7 +36,7 @@ const ChatAssistant = () => {
 
     try {
       // Send message to backend
-      const response = await fetch('http://localhost:5000/api/chat/message', {
+      const response = await fetch(`${API_BASE_URL}/chat/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
