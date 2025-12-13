@@ -1,0 +1,93 @@
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import './Auth.css';
+
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // For demo purposes, accept any login
+      const result = await login(email, password);
+      
+      if (result.success) {
+        navigate('/');
+      } else {
+        setError(result.message || 'Failed to log in');
+      }
+    } catch (err) {
+      setError('Failed to log in');
+    }
+    
+    setLoading(false);
+  };
+
+  return (
+    <div className="auth-container">
+      <div className="auth-card">
+        <h2>Welcome Back</h2>
+        <p>Sign in to your account</p>
+        
+        {error && <div className="alert alert-error">{error}</div>}
+        
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          
+          <button 
+            type="submit" 
+            className="btn btn-primary btn-block"
+            disabled={loading}
+          >
+            {loading ? 'Logging in...' : 'Log In'}
+          </button>
+        </form>
+        
+        <div className="auth-footer">
+          <p>
+            Don't have an account? <Link to="/register">Register</Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

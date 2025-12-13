@@ -1,0 +1,381 @@
+const Event = require('../models/Event');
+const User = require('../models/User');
+const duplicateChecker = require('../ai/duplicateCheck');
+const eventClassifier = require('../ai/classifyEvent');
+const eventModerator = require('../ai/moderateEvent');
+const eventSummarizer = require('../ai/summarizeEvent');
+
+exports.getEvents = async (req, res) => {
+  try {
+    let { latitude, longitude, radius = 10, category, startDate, endDate } = req.query;
+    
+    // Build query for approved events only
+    let query = { status: 'approved' };
+    
+    // Add category filter if provided
+    if (category && category !== 'all') {
+      query.category = category;
+    }
+    
+    // Add date filters if provided
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) {
+        query.date.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        query.date.$lte = new Date(endDate);
+      }
+    }
+    
+    // Add geospatial query if coordinates provided
+    if (latitude && longitude) {
+      query.locationCoords = {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [parseFloat(longitude), parseFloat(latitude)]
+          },
+          $maxDistance: parseFloat(radius) * 1000 // Convert km to meters
+        }
+      };
+    }
+    
+    // Execute query
+    const events = await Event.find(query)
+      .populate('organizer', 'name email')
+      .sort({ date: 1 })
+      .limit(100); // Limit to prevent overload
+    
+    // Transform events for frontend
+    const transformedEvents = events.map(event => ({
+      _id: event._id,
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      latitude: event.locationCoords.coordinates[1],
+      longitude: event.locationCoords.coordinates[0],
+      date: event.date,
+      endDate: event.endDate,
+      category: event.category,
+      attendees: event.attendees.length,
+      organizer: {
+        id: event.organizer._id,
+        name: event.organizer.name
+      }
+    }));
+    
+    res.json(transformedEvents);
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getEventById = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id)
+      .populate('organizer', 'name email')
+      .populate('attendees', 'name email');
+    
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (event.status !== 'approved') {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Transform event for frontend
+    const transformedEvent = {
+      _id: event._id,
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      latitude: event.locationCoords.coordinates[1],
+      longitude: event.locationCoords.coordinates[0],
+      date: event.date,
+      endDate: event.endDate,
+      category: event.category,
+      attendees: event.attendees.map(attendee => ({
+        id: attendee._id,
+        name: attendee.name
+      })),
+      organizer: {
+        id: event.organizer._id,
+        name: event.organizer.name,
+        email: event.organizer.email
+      },
+      createdAt: event.createdAt
+    };
+    
+    res.json(transformedEvent);
+  } catch (error) {
+    console.error('Error fetching event:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.createEvent = async (req, res) => {
+  try {
+    const { title, description, location, latitude, longitude, date, endDate, category } = req.body;
+    
+    // Validate required fields
+    if (!title || !description || !location || !latitude || !longitude || !date) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
+    }
+    
+    // Check if user is organizer or admin
+    if (req.user.role !== 'organizer' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to create events' });
+    }
+    
+    // Run AI moderation
+    const moderationResult = await eventModerator.moderateEvent(title, description);
+    
+    // Run AI classification if category not provided
+    let eventCategory = category;
+    if (!eventCategory) {
+      eventCategory = await eventClassifier.classifyEvent(title, description);
+    }
+    
+    // Run AI summarization
+    const summaryResult = await eventSummarizer.summarizeEvent(title, description);
+    
+    // Run duplicate check
+    const allEvents = await Event.find({});
+    const duplicates = await duplicateChecker.checkForDuplicates(
+      { title, description, latitude, longitude, date }, 
+      allEvents
+    );
+    
+    // Auto-reject if high-risk duplicate found
+    let status = 'pending';
+    let duplicateRisk = 0;
+    
+    if (duplicates.length > 0) {
+      const highestSimilarity = Math.max(...duplicates.map(d => d.similarityScore));
+      duplicateRisk = highestSimilarity;
+      
+      // Auto-reject if very high similarity
+      if (highestSimilarity > 0.9) {
+        status = 'rejected';
+      }
+    }
+    
+    // Auto-reject if high risk score from moderation
+    if (moderationResult.isFlagged && moderationResult.riskScore > 0.7) {
+      status = 'rejected';
+    }
+    
+    // Create event
+    const event = new Event({
+      title,
+      description,
+      location,
+      locationCoords: {
+        type: 'Point',
+        coordinates: [parseFloat(longitude), parseFloat(latitude)]
+      },
+      date: new Date(date),
+      endDate: endDate ? new Date(endDate) : undefined,
+      category: eventCategory,
+      organizer: req.user._id,
+      status,
+      aiFlags: {
+        duplicateRisk,
+        moderationWarnings: moderationResult.warnings.map(w => w.message),
+        riskScore: moderationResult.riskScore,
+        summary: summaryResult.summary,
+        highlights: summaryResult.highlights,
+        tags: summaryResult.tags
+      }
+    });
+    
+    const savedEvent = await event.save();
+    
+    // Populate organizer info
+    await savedEvent.populate('organizer', 'name email');
+    
+    res.status(201).json({
+      message: 'Event created successfully',
+      event: {
+        _id: savedEvent._id,
+        title: savedEvent.title,
+        description: savedEvent.description,
+        location: savedEvent.location,
+        latitude: savedEvent.locationCoords.coordinates[1],
+        longitude: savedEvent.locationCoords.coordinates[0],
+        date: savedEvent.date,
+        endDate: savedEvent.endDate,
+        category: savedEvent.category,
+        status: savedEvent.status,
+        organizer: {
+          id: savedEvent.organizer._id,
+          name: savedEvent.organizer.name
+        },
+        aiSummary: {
+          shortTitle: summaryResult.shortTitle,
+          summary: summaryResult.summary,
+          highlights: summaryResult.highlights,
+          tags: summaryResult.tags
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error creating event:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.updateEvent = async (req, res) => {
+  try {
+    const { title, description, location, latitude, longitude, date, endDate, category, status } = req.body;
+    
+    let event = await Event.findById(req.params.id);
+    
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Check if user is organizer of this event or admin
+    if (req.user.role !== 'admin' && event.organizer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to update this event' });
+    }
+    
+    // Update fields
+    if (title) event.title = title;
+    if (description) event.description = description;
+    if (location) event.location = location;
+    if (latitude && longitude) {
+      event.locationCoords = {
+        type: 'Point',
+        coordinates: [parseFloat(longitude), parseFloat(latitude)]
+      };
+    }
+    if (date) event.date = new Date(date);
+    if (endDate) event.endDate = new Date(endDate);
+    if (category) event.category = category;
+    
+    // Only admins can update status
+    if (status && req.user.role === 'admin') {
+      event.status = status;
+    }
+    
+    const updatedEvent = await event.save();
+    
+    // Populate organizer info
+    await updatedEvent.populate('organizer', 'name email');
+    
+    res.json({
+      message: 'Event updated successfully',
+      event: {
+        _id: updatedEvent._id,
+        title: updatedEvent.title,
+        description: updatedEvent.description,
+        location: updatedEvent.location,
+        latitude: updatedEvent.locationCoords.coordinates[1],
+        longitude: updatedEvent.locationCoords.coordinates[0],
+        date: updatedEvent.date,
+        endDate: updatedEvent.endDate,
+        category: updatedEvent.category,
+        status: updatedEvent.status,
+        organizer: {
+          id: updatedEvent.organizer._id,
+          name: updatedEvent.organizer.name
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error updating event:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.deleteEvent = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Check if user is organizer of this event or admin
+    if (req.user.role !== 'admin' && event.organizer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to delete this event' });
+    }
+    
+    await event.remove();
+    
+    res.json({ message: 'Event deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Attend/leave event
+exports.attendEvent = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (event.status !== 'approved') {
+      return res.status(400).json({ message: 'Cannot attend unapproved event' });
+    }
+    
+    // Check if user is already attending
+    const isAttending = event.attendees.includes(req.user._id);
+    
+    if (isAttending) {
+      // Remove user from attendees
+      event.attendees = event.attendees.filter(
+        attendee => attendee.toString() !== req.user._id.toString()
+      );
+    } else {
+      // Add user to attendees
+      event.attendees.push(req.user._id);
+    }
+    
+    await event.save();
+    
+    res.json({
+      message: isAttending ? 'Left event successfully' : 'Joined event successfully',
+      attendees: event.attendees.length
+    });
+  } catch (error) {
+    console.error('Error attending event:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get events organized by user
+exports.getMyEvents = async (req, res) => {
+  try {
+    const events = await Event.find({ organizer: req.user._id })
+      .populate('attendees', 'name email')
+      .sort({ date: -1 });
+    
+    res.json(events);
+  } catch (error) {
+    console.error('Error fetching my events:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get events user is attending
+exports.getAttendingEvents = async (req, res) => {
+  try {
+    const events = await Event.find({ attendees: req.user._id, status: 'approved' })
+      .populate('organizer', 'name email')
+      .sort({ date: 1 });
+    
+    res.json(events);
+  } catch (error) {
+    console.error('Error fetching attending events:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
