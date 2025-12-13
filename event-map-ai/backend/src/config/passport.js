@@ -3,11 +3,13 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const FacebookStrategy = require('passport-facebook').Strategy;
 const User = require('../models/User');
 
-passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "/api/auth/google/callback"
-},
+// Only configure Google OAuth if credentials are provided
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    passport.use(new GoogleStrategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: "/api/auth/google/callback"
+    },
     async (accessToken, refreshToken, profile, done) => {
         try {
             // Check if user already exists
@@ -42,14 +44,17 @@ passport.use(new GoogleStrategy({
             done(err, null);
         }
     }
-));
+    ));
+}
 
-passport.use(new FacebookStrategy({
-    clientID: process.env.FACEBOOK_APP_ID,
-    clientSecret: process.env.FACEBOOK_APP_SECRET,
-    callbackURL: "/api/auth/facebook/callback",
-    profileFields: ['id', 'displayName', 'emails']
-},
+// Only configure Facebook OAuth if credentials are provided
+if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
+    passport.use(new FacebookStrategy({
+        clientID: process.env.FACEBOOK_APP_ID,
+        clientSecret: process.env.FACEBOOK_APP_SECRET,
+        callbackURL: "/api/auth/facebook/callback",
+        profileFields: ['id', 'displayName', 'emails']
+    },
     async (accessToken, refreshToken, profile, done) => {
         try {
             let user = await User.findOne({ facebookId: profile.id });
@@ -80,6 +85,7 @@ passport.use(new FacebookStrategy({
             done(err, null);
         }
     }
-));
+    ));
+}
 
 module.exports = passport;

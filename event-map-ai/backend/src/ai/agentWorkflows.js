@@ -1,199 +1,137 @@
+/**
+ * AGENT WORKFLOWS
+ * Legacy workflows for backward compatibility with existing routes
+ */
+
 const Event = require('../models/Event');
+const User = require('../models/User');
 const retrievalService = require('./retrievalService');
-const embeddingService = require('./embeddingService');
+const duplicateChecker = require('./duplicateCheck');
+const eventModerator = require('./moderateEvent');
 
 class AgentWorkflows {
   constructor() {
     this.retrievalService = retrievalService;
-    this.embeddingService = embeddingService;
   }
 
-  // Agent for event search and ranking
-  async searchAndRankEvents(query, userLocation = null, limit = 10) {
+  async searchAndRankEvents(query, userLocation = null) {
     try {
-      // Get relevant events based on query
-      const relevantEvents = await this.retrievalService.searchRelevantEvents(query, limit * 2);
-      
-      // If user location is provided, rank by proximity
+      // Get events from database
+      let events = await Event.find({ status: 'approved' })
+        .populate('organizer', 'name email')
+        .lean();
+
+      // Apply location filter if provided
       if (userLocation) {
-        relevantEvents.forEach(event => {
-          // Skip events without location metadata
-          if (!event.metadata.locationCoords) return;
+        events = events.filter(event => {
+          if (!event.locationCoords) return true;
           
           const distance = this.calculateDistance(
-            userLocation.latitude, userLocation.longitude,
-            parseFloat(event.metadata.locationCoords.coordinates[1]), parseFloat(event.metadata.locationCoords.coordinates[0])
+            userLocation,
+            {
+              latitude: event.locationCoords.coordinates[1],
+              longitude: event.locationCoords.coordinates[0]
+            }
           );
-          event.distance = distance;
-        });
-        
-        // Sort by distance and then by relevance
-        relevantEvents.sort((a, b) => {
-          // Primary sort by distance
-          if (a.distance !== b.distance) {
-            return a.distance - b.distance;
-          }
-          // Secondary sort by relevance (distance score)
-          return a.distance - b.distance;
+          
+          return distance <= 50; // 50km radius
         });
       }
-      
-      // Return top events
-      return relevantEvents.slice(0, limit);
+
+      // Simple text-based ranking
+      const rankedEvents = events.map(event => {
+        const relevanceScore = this.calculateRelevanceScore(query, event);
+        return {
+          ...event,
+          relevanceScore
+        };
+      }).sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+      return rankedEvents.slice(0, 10);
     } catch (error) {
-      console.error('Error in search and rank agent:', error);
-      throw error;
+      console.error('Search and rank error:', error);
+      return [];
     }
   }
 
-  // Agent for duplicate detection
-  async detectDuplicates(newEvent) {
+  async detectDuplicates(eventData) {
     try {
-      // Generate embedding for new event
-      const newEventEmbedding = await this.embeddingService.generateEventEmbedding(newEvent);
-      
-      // Search for similar events
-      const similarEvents = await this.retrievalService.searchRelevantEvents(
-        `${newEvent.title} ${newEvent.description}`, 10
-      );
-      
-      // Filter for high similarity duplicates
-      const duplicates = similarEvents.filter(event => {
-        // Skip events without required metadata
-        if (!event.metadata.title || !event.metadata.description) return false;
-        
-        // Calculate similarity based on metadata match
-        const titleMatch = this.calculateTextSimilarity(
-          newEvent.title.toLowerCase(), 
-          event.metadata.title.toLowerCase()
-        );
-        
-        const descriptionMatch = this.calculateTextSimilarity(
-          newEvent.description.toLowerCase(), 
-          event.metadata.description.toLowerCase()
-        );
-        
-        // Combined similarity score
-        const similarityScore = (titleMatch * 0.6 + descriptionMatch * 0.4);
-        
-        return similarityScore > 0.8; // Threshold for duplicate detection
-      });
-      
-      return {
-        isDuplicate: duplicates.length > 0,
-        duplicates: duplicates,
-        confidence: duplicates.length > 0 ? this.calculateConfidence(duplicates[0]) : 0
-      };
+      const existingEvents = await Event.find({ status: { $in: ['approved', 'pending'] } }).lean();
+      return await duplicateChecker.checkForDuplicates(eventData, existingEvents);
     } catch (error) {
-      console.error('Error in duplicate detection agent:', error);
-      throw error;
+      console.error('Duplicate detection error:', error);
+      return { duplicates: [], isDuplicate: false };
     }
   }
 
-  // Agent for content moderation
   async moderateContent(eventData) {
     try {
-      const { title, description } = eventData;
-      const text = `${title} ${description}`.toLowerCase();
-      
-      // Define moderation categories and keywords
-      const moderationCategories = {
-        nsfw: ['porn', 'sex', 'xxx', 'adult', 'nude', 'naked', 'erotic'],
-        hate_speech: ['hate', 'racist', 'discriminat', 'violence', 'threat'],
-        spam: ['click here', 'buy now', 'limited time', 'act fast', 'free money'],
-        fake: ['fake event', 'not real', 'scam', 'fraud']
-      };
-      
-      const flags = [];
-      let riskScore = 0;
-      
-      // Check each category
-      for (const [category, keywords] of Object.entries(moderationCategories)) {
-        const matches = keywords.filter(keyword => text.includes(keyword)).length;
-        if (matches > 0) {
-          flags.push({
-            category: category,
-            matches: matches,
-            severity: matches > 2 ? 'high' : matches > 1 ? 'medium' : 'low'
-          });
-          
-          // Add to risk score
-          riskScore += matches * (category === 'nsfw' || category === 'hate_speech' ? 0.3 : 0.1);
-        }
-      }
-      
-      // Cap risk score at 1.0
-      riskScore = Math.min(riskScore, 1.0);
-      
-      return {
-        isFlagged: riskScore > 0.5,
-        riskScore: parseFloat(riskScore.toFixed(2)),
-        flags: flags
-      };
+      return await eventModerator.moderateEvent(eventData.title, eventData.description);
     } catch (error) {
-      console.error('Error in content moderation agent:', error);
-      throw error;
+      console.error('Content moderation error:', error);
+      return { isFlagged: false, warnings: [], riskScore: 0 };
     }
   }
 
-  // Agent for event recommendations
   async recommendEvents(userId, limit = 5) {
     try {
-      // In a more sophisticated implementation, this would consider:
-      // - User's past attended events
-      // - User's preferences
-      // - Current location
-      // - Time of day/week
-      
-      // For now, we'll return recently approved events
-      const recentEvents = await Event.find({ status: 'approved' })
-        .sort({ createdAt: -1 })
+      const user = await User.findById(userId).lean();
+      if (!user) return [];
+
+      const events = await Event.find({ status: 'approved' })
+        .populate('organizer', 'name email')
+        .sort({ attendees: -1, createdAt: -1 }) // Sort by popularity and recency
         .limit(limit)
-        .populate('organizer', 'name');
-      
-      return recentEvents;
+        .lean();
+
+      return events.map(event => ({
+        ...event,
+        recommendationReason: 'Popular event'
+      }));
     } catch (error) {
-      console.error('Error in recommendation agent:', error);
-      throw error;
+      console.error('Recommendation error:', error);
+      return [];
     }
   }
 
-  // Helper method to calculate distance between two points
-  calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of the earth in km
-    const dLat = this.deg2rad(lat2 - lat1);
-    const dLon = this.deg2rad(lon2 - lon1);
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2); 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    return R * c; // Distance in km
+  calculateDistance(location1, location2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = this.toRadians(location2.latitude - location1.latitude);
+    const dLon = this.toRadians(location2.longitude - location1.longitude);
+    
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(this.toRadians(location1.latitude)) * Math.cos(this.toRadians(location2.latitude)) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
   }
 
-  // Helper method to convert degrees to radians
-  deg2rad(deg) {
-    return deg * (Math.PI/180);
+  toRadians(degrees) {
+    return degrees * (Math.PI / 180);
   }
 
-  // Helper method to calculate text similarity
-  calculateTextSimilarity(str1, str2) {
-    // Simple Jaccard similarity
-    const set1 = new Set(str1.split(/\s+/));
-    const set2 = new Set(str2.split(/\s+/));
-    const intersection = new Set([...set1].filter(x => set2.has(x)));
-    const union = new Set([...set1, ...set2]);
-    return intersection.size / union.size;
-  }
+  calculateRelevanceScore(query, event) {
+    const queryLower = query.toLowerCase();
+    const searchableText = [
+      event.title || '',
+      event.description || '',
+      event.category || '',
+      event.location || ''
+    ].join(' ').toLowerCase();
 
-  // Helper method to calculate confidence
-  calculateConfidence(event) {
-    // Use distance if available, otherwise return 0.5 as default
-    if (event.distance !== undefined) {
-      // Inverse of distance as confidence measure
-      return Math.max(0, 1 - event.distance);
-    }
-    return 0.5;
+    const queryWords = queryLower.split(' ').filter(word => word.length > 2);
+    let score = 0;
+
+    queryWords.forEach(word => {
+      if (searchableText.includes(word)) {
+        if ((event.title || '').toLowerCase().includes(word)) score += 3;
+        else if ((event.category || '').toLowerCase().includes(word)) score += 2;
+        else score += 1;
+      }
+    });
+
+    return score / queryWords.length;
   }
 }
 
