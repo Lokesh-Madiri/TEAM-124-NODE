@@ -36,7 +36,7 @@ async function testGuestScenario(scenario) {
     console.log(`\n🧪 Testing Scenario ${scenario.id}: ${scenario.description}`);
     console.log(`❓ Question: "${scenario.question}"`);
     
-    const response = await fetch('http://localhost:5000/api/ai-assistant/message', {
+    const response = await fetch('http://localhost:5000/api/ai-assistant/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

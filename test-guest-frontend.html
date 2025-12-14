@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guest User AI Assistant Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        .success {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        .error {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .loading {
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 Guest User AI Assistant Test</h1>
+    <p>This page tests the AI assistant functionality for guest users (not logged in).</p>
+
+    <div class="test-container">
+        <h3>Test Scenarios</h3>
+        <button class="test-button" onclick="testScenario('What tech events are happening this weekend?', 1)">
+            Tech Events This Weekend
+        </button>
+        <button class="test-button" onclick="testScenario('Can you recommend some events for me?', 2)">
+            Recommend Events
+        </button>
+        <button class="test-button" onclick="testScenario('How do I create an event?', 3)">
+            Create Event Help
+        </button>
+        <button class="test-button" onclick="testScenario('Show me all events near downtown', 4)">
+            Events Near Downtown
+        </button>
+        <button class="test-button" onclick="testScenario('Hello, what can you help me with?', 5)">
+            General Help
+        </button>
+        <button class="test-button" onclick="runAllTests()">
+            🚀 Run All Tests
+        </button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        
+        async function testScenario(message, scenarioId) {
+            const resultsDiv = document.getElementById('results');
+            const testDiv = document.createElement('div');
+            testDiv.className = 'test-container';
+            testDiv.innerHTML = `
+                <h4>Scenario ${scenarioId}: "${message}"</h4>
+                <div class="response loading">Testing...</div>
+            `;
+            resultsDiv.appendChild(testDiv);
+            
+            const responseDiv = testDiv.querySelector('.response');
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch(`${API_BASE}/ai-assistant/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        sessionId: `test_guest_${scenarioId}_${Date.now()}`
+                    })
+                });
+                
+                const data = await response.json();
+                const endTime = Date.now();
+                
+                if (data.success) {
+                    responseDiv.className = 'response success';
+                    responseDiv.innerHTML = `
+✅ SUCCESS (${endTime - startTime}ms)
+Role: ${data.metadata.userRole}
+Agents: ${data.explanation.agentsUsed.join(', ')}
+Safety: ${data.explanation.safetyStatus}
+
+🤖 AI Response:
+${data.message}
+
+📊 Additional Data:
+${JSON.stringify(data.data, null, 2)}
+                    `;
+                } else {
+                    responseDiv.className = 'response error';
+                    responseDiv.innerHTML = `
+❌ FAILED
+Error: ${data.error}
+                    `;
+                }
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.innerHTML = `
+💥 ERROR
+${error.message}
+                `;
+            }
+        }
+        
+        async function runAllTests() {
+            document.getElementById('results').innerHTML = '';
+            
+            const scenarios = [
+                'What tech events are happening this weekend?',
+                'Can you recommend some events for me?',
+                'How do I create an event?',
+                'Show me all events near downtown',
+                'Hello, what can you help me with?'
+            ];
+            
+            for (let i = 0; i < scenarios.length; i++) {
+                await testScenario(scenarios[i], i + 1);
+                // Wait between tests to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+    </script>
+</body>
+</html>
