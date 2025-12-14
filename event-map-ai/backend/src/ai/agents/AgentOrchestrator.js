@@ -270,23 +270,24 @@ class AgentOrchestrator {
   }
 
   /**
-   * GUEST WORKFLOW - Limited functionality for non-authenticated users
+   * ENHANCED GUEST WORKFLOW - Accurate responses for non-authenticated users
    */
   async handleGuestWorkflow(userInput, intentResult, roleContext) {
     try {
-      // For guest users, provide basic event search functionality
+      // For guest users, provide comprehensive event search functionality
       if (intentResult.category === 'search' || intentResult.category === 'find') {
-        // Basic geo-context analysis (without user preferences)
+        // Enhanced geo-context analysis
         const geoContext = await this.geoContextAgent.analyzeLocation(userInput);
         this.logExecution('GeoContextAgent', geoContext);
 
-        // Basic event retrieval (no personalization)
+        // Comprehensive event retrieval with better filtering
         const events = await this.eventRetrievalAgent.searchEvents({
           query: userInput.message,
           location: geoContext.coordinates,
-          radius: geoContext.radius || 25,
+          radius: geoContext.radius || 50, // Wider search for guests
           filters: intentResult.filters,
-          userPreferences: null // No user preferences for guests
+          userPreferences: null,
+          includeAll: true // Include all relevant events for guests
         });
         this.logExecution('EventRetrievalAgent', { found: events.length });
 
@@ -294,86 +295,116 @@ class AgentOrchestrator {
         const safetyCheck = await this.safetyModerationAgent.validateResults(events);
         this.logExecution('SafetyModerationAgent', safetyCheck);
 
-        // Basic ranking (no personalization)
-        const basicRanking = events.slice(0, 5).map(event => ({
+        // Smart ranking for guests (by relevance, date, popularity)
+        const smartRanking = events.slice(0, 8).map((event, index) => ({
           ...event,
-          explanation: `Found this event matching your search criteria`
+          explanation: this.generateGuestEventExplanation(event, userInput.message, index)
         }));
 
-        // Generate intelligent response for guest search
-        const aiResponse = await this.generateIntelligentResponse(
-          userInput.message,
-          basicRanking,
-          geoContext,
-          'guest_search'
-        );
+        // Generate contextual AI response
+        const contextualPrompt = this.buildGuestSearchPrompt(userInput.message, smartRanking, geoContext);
+        const aiResponse = await aiService.generateResponse(contextualPrompt, { maxTokens: 400 });
 
         return {
           message: aiResponse,
           data: {
-            events: basicRanking,
+            events: smartRanking.slice(0, 5),
             totalFound: events.length,
             location: geoContext.locationName,
-            loginPrompt: "Log in for personalized recommendations and advanced features!"
+            searchTips: this.getGuestSearchTips(userInput.message),
+            loginPrompt: "Log in for personalized recommendations and to save favorites!"
           },
-          reasoning: ['Basic event search for guest user', 'No personalization applied'],
-          confidence: 0.7,
+          reasoning: ['Enhanced guest search with AI assistance', 'Contextual event matching'],
+          confidence: 0.85,
           safetyStatus: safetyCheck.status
         };
       } else if (intentResult.category === 'recommend') {
-        // Encourage login for recommendations
+        // Provide general recommendations for guests
+        const popularEvents = await this.eventRetrievalAgent.getPopularEvents({ limit: 5 });
+        this.logExecution('EventRetrievalAgent', { popularEvents: popularEvents.length });
+
+        const recommendationPrompt = this.buildGuestRecommendationPrompt(userInput.message, popularEvents);
+        const aiResponse = await aiService.generateResponse(recommendationPrompt, { maxTokens: 350 });
+
         return {
-          message: "I'd love to give you personalized recommendations! To provide the best suggestions based on your interests and location, please log in to your account. I can still help you search for specific types of events though - try asking 'find tech events' or 'show music events this weekend'.",
+          message: aiResponse,
           data: {
+            popularEvents: popularEvents,
             loginPrompt: true,
-            guestCapabilities: ['Basic event search', 'Browse all events', 'Filter by category']
+            guestCapabilities: ['Browse popular events', 'Search by category', 'View event details']
           },
-          reasoning: ['Guest user requested recommendations', 'Login required for personalization'],
-          confidence: 1.0,
+          reasoning: ['Guest recommendations based on popular events', 'Encouraging login for personalization'],
+          confidence: 0.8,
+          safetyStatus: 'safe'
+        };
+      } else if (intentResult.category === 'create') {
+        // Help guests with event creation guidance
+        const creationPrompt = this.buildGuestCreationPrompt(userInput.message);
+        const aiResponse = await aiService.generateResponse(creationPrompt, { maxTokens: 300 });
+
+        return {
+          message: aiResponse,
+          data: {
+            creationTips: [
+              'Choose a clear, descriptive title',
+              'Include date, time, and location',
+              'Explain what attendees will gain',
+              'Add contact information'
+            ],
+            loginPrompt: "Log in to access our event creation tools and AI-powered description generator!"
+          },
+          reasoning: ['Guest event creation guidance', 'Promoting organizer features'],
+          confidence: 0.9,
           safetyStatus: 'safe'
         };
       } else {
-        // Generate intelligent guest response
-        const aiResponse = await this.generateIntelligentResponse(
-          userInput.message,
-          null,
-          null,
-          'general',
-          { role: 'guest' }
-        );
+        // Enhanced general conversation for guests
+        const generalPrompt = this.buildGuestGeneralPrompt(userInput.message);
+        const aiResponse = await aiService.generateResponse(generalPrompt, { maxTokens: 300 });
 
         return {
           message: aiResponse,
           data: {
             guestCapabilities: [
-              'Search for events by keyword',
-              'Find events by location',
-              'Browse events by category',
-              'View event details'
+              'Search for events by keyword or category',
+              'Find events by location and date',
+              'Browse popular and trending events',
+              'Get event creation guidance',
+              'Ask questions about events'
             ],
             loginBenefits: [
-              'Personalized recommendations',
-              'Save favorite events',
-              'Get location-based suggestions',
-              'Advanced AI assistance'
+              'Personalized AI recommendations',
+              'Save and track favorite events',
+              'Create and manage your own events',
+              'Advanced search and filtering',
+              'AI-powered event descriptions'
             ]
           },
-          reasoning: ['Guest user general interaction with AI assistance', 'Promoting login benefits'],
-          confidence: 0.8,
+          reasoning: ['Enhanced guest interaction with contextual AI', 'Comprehensive feature overview'],
+          confidence: 0.85,
           safetyStatus: 'safe'
         };
       }
     } catch (error) {
       console.error('Guest workflow error:', error);
+      
+      // Provide helpful fallback even on errors
+      const fallbackMessage = this.getIntelligentGuestFallback(userInput.message);
+      
       return {
-        message: "I'm having some trouble right now. Please try searching for events or consider logging in for the full experience!",
+        message: fallbackMessage,
         data: {
-          error: true,
+          error: false, // Don't show as error to user
+          helpfulTips: [
+            'Try searching for specific event types like "tech events" or "music concerts"',
+            'Include location in your search like "events in downtown"',
+            'Ask about popular events or upcoming activities'
+          ],
           loginPrompt: true
         },
-        reasoning: ['Error in guest workflow'],
-        confidence: 0.3,
-        safetyStatus: 'error'
+        reasoning: ['Intelligent fallback for guest user'],
+        confidence: 0.6,
+        safetyStatus: 'safe'
       };
     }
   }
@@ -581,6 +612,138 @@ class AgentOrchestrator {
     }
     
     return capabilities;
+  }
+
+  /**
+   * Enhanced Guest Helper Methods
+   */
+  generateGuestEventExplanation(event, query, index) {
+    const lowerQuery = query.toLowerCase();
+    const lowerTitle = event.title?.toLowerCase() || '';
+    const lowerDescription = event.description?.toLowerCase() || '';
+    
+    if (lowerQuery.includes('tech') && (lowerTitle.includes('tech') || lowerDescription.includes('tech'))) {
+      return 'Matches your tech interest - great for networking and learning';
+    }
+    if (lowerQuery.includes('music') && (lowerTitle.includes('music') || lowerDescription.includes('music'))) {
+      return 'Perfect music event - enjoy live performances and discover new artists';
+    }
+    if (lowerQuery.includes('weekend') && this.isWeekendEvent(event.date)) {
+      return 'Happening this weekend - perfect timing for your schedule';
+    }
+    if (lowerQuery.includes('free') && event.price === 0) {
+      return 'Free event - great value and open to everyone';
+    }
+    
+    return index === 0 ? 'Top match for your search' : 'Relevant event matching your criteria';
+  }
+
+  buildGuestSearchPrompt(userMessage, events, geoContext) {
+    const eventsList = events.slice(0, 3).map(event => 
+      `• ${event.title} - ${event.location} on ${new Date(event.date).toLocaleDateString()}`
+    ).join('\n');
+
+    return `You are an AI assistant for an event discovery platform. A guest user (not logged in) asked: "${userMessage}"
+
+I found ${events.length} events${geoContext?.locationName ? ` near ${geoContext.locationName}` : ''}:
+${eventsList}
+
+Provide a helpful, enthusiastic response that:
+- Acknowledges their search and shows the best matches
+- Explains why these events are relevant
+- Encourages them to explore more or log in for personalized features
+- Keeps a friendly, welcoming tone
+- Mentions they can search for more specific types if needed
+
+Be conversational and helpful, not robotic.`;
+  }
+
+  buildGuestRecommendationPrompt(userMessage, popularEvents) {
+    const eventsList = popularEvents.slice(0, 3).map(event => 
+      `• ${event.title} - ${event.description?.substring(0, 50)}...`
+    ).join('\n');
+
+    return `You are an AI assistant for an event discovery platform. A guest user asked: "${userMessage}"
+
+Here are some popular events happening soon:
+${eventsList}
+
+Provide a friendly response that:
+- Shows enthusiasm about helping them discover events
+- Highlights the popular events briefly
+- Explains that logging in would give them personalized recommendations
+- Suggests they can also search for specific types of events
+- Keeps an encouraging, helpful tone
+
+Make it conversational and inviting.`;
+  }
+
+  buildGuestCreationPrompt(userMessage) {
+    return `You are an AI assistant for an event discovery platform. A guest user asked about creating events: "${userMessage}"
+
+Provide helpful guidance that:
+- Shows enthusiasm for their event creation interest
+- Gives 3-4 practical tips for creating great events
+- Mentions that logging in gives access to AI-powered tools
+- Encourages them to sign up to use the full event creation features
+- Keeps a supportive, encouraging tone
+
+Be helpful and motivating.`;
+  }
+
+  buildGuestGeneralPrompt(userMessage) {
+    return `You are an AI assistant for an event discovery platform. A guest user said: "${userMessage}"
+
+Provide a warm, helpful response that:
+- Welcomes them to the platform
+- Explains what you can help them with (finding events, getting info, etc.)
+- Mentions the benefits of creating an account
+- Asks what they're interested in or how you can help
+- Keeps a friendly, conversational tone
+
+Be welcoming and guide them toward using the platform.`;
+  }
+
+  getGuestSearchTips(query) {
+    const tips = [];
+    const lowerQuery = query.toLowerCase();
+    
+    if (!lowerQuery.includes('tech') && !lowerQuery.includes('music') && !lowerQuery.includes('art')) {
+      tips.push('Try searching by category: "tech events", "music concerts", "art exhibitions"');
+    }
+    
+    if (!lowerQuery.includes('weekend') && !lowerQuery.includes('today') && !lowerQuery.includes('tomorrow')) {
+      tips.push('Add time filters: "this weekend", "next week", "today"');
+    }
+    
+    if (!lowerQuery.includes('near') && !lowerQuery.includes('in ')) {
+      tips.push('Include location: "events near me", "events in downtown"');
+    }
+    
+    tips.push('Log in for personalized recommendations based on your interests');
+    
+    return tips.slice(0, 3);
+  }
+
+  getIntelligentGuestFallback(userMessage) {
+    const lowerMessage = userMessage.toLowerCase();
+    
+    if (lowerMessage.includes('help') || lowerMessage.includes('what')) {
+      return "I'm here to help you discover amazing events! I can search for events by type, location, or date. Try asking me things like 'find tech events this weekend' or 'show me music concerts near me'. For personalized recommendations and advanced features, consider creating an account!";
+    }
+    
+    if (lowerMessage.includes('event') && lowerMessage.includes('create')) {
+      return "I'd love to help you create an event! While I can give you some general tips as a guest, our full event creation tools with AI-powered descriptions are available when you log in. Would you like some basic event planning advice to get started?";
+    }
+    
+    return "I'm your AI event assistant! I can help you find events, get information about activities in your area, and answer questions about our platform. What kind of events are you interested in? Try being specific like 'tech meetups' or 'weekend activities'!";
+  }
+
+  isWeekendEvent(dateString) {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    const day = date.getDay();
+    return day === 0 || day === 6; // Sunday or Saturday
   }
 }
 

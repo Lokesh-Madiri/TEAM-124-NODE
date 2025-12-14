@@ -11,18 +11,14 @@ class AIService {
     this.primaryService = null;
     this.fallbackService = null;
     
-    // Determine which services are available
-    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
-      this.primaryService = openaiService;
-      this.fallbackService = geminiService;
-      console.log('✅ AI Service: Using OpenAI as primary');
-    } else if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
+    // Use only Gemini AI (OpenAI disabled due to quota issues)
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
       this.primaryService = geminiService;
-      this.fallbackService = openaiService;
-      console.log('✅ AI Service: Using Gemini as primary');
+      this.fallbackService = null; // No fallback needed
+      console.log('✅ AI Service: Using Gemini AI exclusively');
     } else {
-      console.log('⚠️ AI Service: No valid API keys configured, using intelligent fallback responses');
-      console.log('💡 To enable full AI capabilities, set OPENAI_API_KEY or GEMINI_API_KEY in your .env file');
+      console.log('⚠️ AI Service: No Gemini API key configured, using intelligent fallback responses');
+      console.log('💡 To enable full AI capabilities, set GEMINI_API_KEY in your .env file');
     }
   }
 
