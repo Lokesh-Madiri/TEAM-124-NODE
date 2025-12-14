@@ -142,7 +142,27 @@ class AIService {
     const userMessage = userMessageMatch ? userMessageMatch[1] : prompt;
     const lowerPrompt = userMessage.toLowerCase();
     
-
+    console.log(`🔄 Enhanced static fallback for: "${userMessage}"`);
+    
+    // Weekend/time-based queries (high priority)
+    if (lowerPrompt.includes('weekend') || lowerPrompt.includes('this weekend')) {
+      return "Looking for weekend events? Great idea! I can help you find activities happening Saturday and Sunday. Try searching for specific types like 'weekend tech events', 'weekend music shows', or 'weekend workshops'. You can also specify your location for better results!";
+    }
+    
+    // Event creation help (high priority)
+    if (lowerPrompt.includes('create') && (lowerPrompt.includes('event') || lowerPrompt.includes('description'))) {
+      return "I'd love to help you create an amazing event! Here are some key tips for great event descriptions:\n\n• Start with a compelling title that clearly states what it is\n• Include the main benefit attendees will get\n• Mention date, time, and location clearly\n• Add what makes your event unique\n• Include a clear call-to-action\n\nFor AI-powered description generation and advanced tools, consider creating an account! What type of event are you planning?";
+    }
+    
+    // Help/capabilities queries (high priority)
+    if (lowerPrompt.includes('help') || lowerPrompt.includes('what can you') || lowerPrompt.includes('what do you')) {
+      return "I'm your AI Event Assistant! Here's how I can help you:\n\n🔍 **Find Events**: Search by type, location, date, or keywords\n📅 **Discover Activities**: Weekend events, popular shows, local meetups\n✍️ **Event Creation**: Tips and guidance for organizing events\n💡 **Get Recommendations**: Suggestions based on what's popular\n\n**For Guests**: Basic search and discovery\n**For Members**: Personalized recommendations, saved favorites, event creation tools\n\nWhat would you like to explore?";
+    }
+    
+    // Recommendation requests (high priority)
+    if (lowerPrompt.includes('recommend') || lowerPrompt.includes('suggest')) {
+      return "I'd love to recommend events for you! While I can show you popular events as a guest, personalized recommendations work best when you're logged in so I can learn your preferences.\n\nFor now, I can help you search for specific types of events like:\n• Tech meetups and conferences\n• Music concerts and festivals\n• Art exhibitions and workshops\n• Business networking events\n\nWhat type of events interest you most?";
+    }
     
     // Greeting responses
     if (lowerPrompt.includes('hello') || lowerPrompt.includes('hi') || lowerPrompt.includes('hey')) {

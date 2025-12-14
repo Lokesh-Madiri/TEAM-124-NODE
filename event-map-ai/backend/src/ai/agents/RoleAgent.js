@@ -8,6 +8,14 @@ const User = require('../../models/User');
 class RoleAgent {
   constructor() {
     this.roleCapabilities = {
+      guest: {
+        canCreateEvents: false,
+        canModerate: false,
+        canAnalyze: false,
+        canViewAll: false,
+        isAdmin: false,
+        permissions: ['search', 'view_public', 'basic_recommend']
+      },
       user: {
         canCreateEvents: false,
         canModerate: false,
@@ -35,6 +43,7 @@ class RoleAgent {
     };
 
     this.roleGreetings = {
+      guest: "Hi! I'm your AI Event Assistant. I can help you discover events and browse what's happening. For personalized recommendations and advanced features, consider creating an account!",
       user: "Hi! I'm your AI Event Assistant. I can help you discover amazing events and get personalized recommendations.",
       organizer: "Hello Event Organizer! I can help you find events, create compelling descriptions, and analyze your event performance.",
       admin: "Welcome Admin! I can assist with event moderation, platform analytics, and governance insights."
@@ -43,7 +52,16 @@ class RoleAgent {
 
   async determineRole(userId, providedRole = null) {
     try {
+      // Handle guest users (no userId provided)
+      if (!userId) {
+        return this.buildRoleContext('guest', null);
+      }
+
       // If role is provided in request, validate it
+      if (providedRole && providedRole === 'guest') {
+        return this.buildRoleContext('guest', null);
+      }
+
       if (providedRole) {
         const userFromDb = await User.findById(userId);
         if (userFromDb && userFromDb.role === providedRole) {
@@ -54,16 +72,16 @@ class RoleAgent {
       // Fetch user from database to get actual role
       const user = await User.findById(userId);
       if (!user) {
-        // Default to user role for anonymous/unknown users
-        return this.buildRoleContext('user', null);
+        // Default to guest role for anonymous/unknown users
+        return this.buildRoleContext('guest', null);
       }
 
       return this.buildRoleContext(user.role, user);
 
     } catch (error) {
       console.error('Error determining user role:', error);
-      // Default to user role on error
-      return this.buildRoleContext('user', null);
+      // Default to guest role on error
+      return this.buildRoleContext('guest', null);
     }
   }
 
@@ -84,6 +102,12 @@ class RoleAgent {
 
   getContextualHelp(role) {
     const helpTexts = {
+      guest: [
+        "Search for events by keyword or category",
+        "Find events by location and date",
+        "Browse popular and trending events",
+        "Get basic event information and details"
+      ],
       user: [
         "Ask me to find events near you",
         "Get personalized recommendations",
@@ -106,11 +130,17 @@ class RoleAgent {
       ]
     };
 
-    return helpTexts[role] || helpTexts.user;
+    return helpTexts[role] || helpTexts.guest;
   }
 
   getRoleRestrictions(role) {
     const restrictions = {
+      guest: [
+        "Cannot save favorite events (login required)",
+        "Cannot create events (account required)",
+        "Limited to basic search and browsing",
+        "No personalized recommendations"
+      ],
       user: [
         "Cannot create events (upgrade to organizer)",
         "Cannot access moderation tools",
@@ -126,7 +156,7 @@ class RoleAgent {
       ]
     };
 
-    return restrictions[role] || restrictions.user;
+    return restrictions[role] || restrictions.guest;
   }
 
   /**
@@ -142,6 +172,7 @@ class RoleAgent {
    */
   formatResponseForRole(roleContext, baseResponse) {
     const rolePrefix = {
+      guest: "🔍 ",
       user: "🎉 ",
       organizer: "📊 ",
       admin: "🛡️ "
@@ -150,7 +181,9 @@ class RoleAgent {
     const prefix = rolePrefix[roleContext.role] || "";
     
     // Add role-specific context to responses
-    if (roleContext.role === 'organizer' && baseResponse.includes('event')) {
+    if (roleContext.role === 'guest' && baseResponse.includes('event')) {
+      baseResponse += "\n\n💡 *Tip: Create an account for personalized recommendations and to save favorites!*";
+    } else if (roleContext.role === 'organizer' && baseResponse.includes('event')) {
       baseResponse += "\n\n💡 *Tip: I can help you create better event descriptions and analyze performance!*";
     } else if (roleContext.role === 'admin' && baseResponse.includes('flagged')) {
       baseResponse += "\n\n🔍 *Admin: Use 'review flagged events' to see moderation queue.*";
@@ -165,16 +198,19 @@ class RoleAgent {
   getRoleErrorMessage(roleContext, errorType) {
     const errorMessages = {
       permission_denied: {
+        guest: "This feature requires an account. Please log in or sign up to access advanced features.",
         user: "This feature requires organizer privileges. Would you like to upgrade your account?",
         organizer: "This action requires admin privileges.",
         admin: "An unexpected permission error occurred."
       },
       not_found: {
+        guest: "I couldn't find what you're looking for. Try different search terms or browse our popular events.",
         user: "I couldn't find what you're looking for. Try a different search term.",
         organizer: "No events found matching your criteria. Consider broadening your search.",
         admin: "Resource not found. Check the ID and try again."
       },
       rate_limit: {
+        guest: "You're browsing very quickly! Please wait a moment before trying again.",
         user: "You're asking questions very quickly! Please wait a moment before trying again.",
         organizer: "Rate limit reached. Please wait before making more requests.",
         admin: "Admin rate limit exceeded. Please wait before continuing."
