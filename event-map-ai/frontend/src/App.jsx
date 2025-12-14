@@ -9,11 +9,34 @@ import UserProfile from './components/UserProfile';
 import CreateEvent from './components/CreateEvent';
 import Navigation from './components/Navigation';
 import AIEventBot from './components/AIEventBot';
+import { ToastContainer, useToast } from './components/Toast';
 import AuthProvider from './context/AuthContext';
+import './styles/theme.css';
 import './App.css';
 
 function App() {
   const [events, setEvents] = useState([]);
+  const [userLocation, setUserLocation] = useState(null);
+  const [filters, setFilters] = useState({});
+  const { toasts, toast, removeToast } = useToast();
+
+  // Get user location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+        },
+        (error) => {
+          console.log('Location permission denied or unavailable');
+        }
+      );
+    }
+  }, []);
 
   // Fetch events data for the AI bot
   useEffect(() => {
@@ -95,8 +118,16 @@ function App() {
             <Route path="/create-event" element={<CreateEvent />} />
           </Routes>
 
-          {/* AI Event Bot - Available on all pages */}
-          <AIEventBot events={events} />
+          {/* AI Event Bot - Available on all pages with full context */}
+          <AIEventBot 
+            events={events} 
+            userLocation={userLocation}
+            filters={filters}
+            onFilterChange={setFilters}
+          />
+          
+          {/* Toast Notifications */}
+          <ToastContainer toasts={toasts} removeToast={removeToast} />
         </div>
       </Router>
     </AuthProvider>

@@ -15,6 +15,9 @@ L.Icon.Default.mergeOptions({
 });
 
 export default function CreateEvent() {
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 4;
+  
   const [eventData, setEventData] = useState({
     title: '',
     description: '',
@@ -115,6 +118,35 @@ export default function CreateEvent() {
       setError("Geolocation is not supported by your browser. Please select location manually on the map.");
     }
   }, []);
+
+  const validateStep = (step) => {
+    switch(step) {
+      case 1:
+        return eventData.title && eventData.category;
+      case 2:
+        return eventData.description;
+      case 3:
+        return eventData.location && eventData.latitude && eventData.longitude;
+      case 4:
+        return eventData.date;
+      default:
+        return true;
+    }
+  };
+
+  const nextStep = () => {
+    if (validateStep(currentStep)) {
+      setError('');
+      setCurrentStep(prev => Math.min(prev + 1, totalSteps));
+    } else {
+      setError('Please complete all required fields before continuing');
+    }
+  };
+
+  const prevStep = () => {
+    setError('');
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -282,287 +314,330 @@ export default function CreateEvent() {
 
   return (
     <div className="create-event-container">
-      <div className="create-event-card">
+      <div className="create-event-card wizard">
         <h2>Create New Event</h2>
+
+        {/* Progress Indicator */}
+        <div className="progress-indicator">
+          <div className="progress-steps">
+            {[1, 2, 3, 4].map(step => (
+              <div 
+                key={step}
+                className={`progress-step ${
+                  step === currentStep ? 'active' : 
+                  step < currentStep ? 'completed' : ''
+                }`}
+              >
+                <div className="step-number">
+                  {step < currentStep ? '✓' : step}
+                </div>
+                <div className="step-label">
+                  {step === 1 && 'Basic Info'}
+                  {step === 2 && 'Description'}
+                  {step === 3 && 'Location'}
+                  {step === 4 && 'Date & Details'}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="progress-bar-container">
+            <div 
+              className="progress-bar-fill"
+              style={{width: `${(currentStep / totalSteps) * 100}%`}}
+            />
+          </div>
+        </div>
 
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">Event created successfully!</div>}
 
-        <div className="map-section">
-          <h3>Select Event Location</h3>
-          
-          <div className="location-options">
-            <div className="toggle-option">
-              <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={useCurrentLocation}
-                  onChange={toggleUseCurrentLocation}
-                />
-                <span className="slider round"></span>
-              </label>
-              <span className="toggle-label">
-                {useCurrentLocation ? 'Using Current Location' : 'Set Manual Location'}
-              </span>
-            </div>
-            
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={enableMarkerDrag}
-              style={{ marginTop: '10px' }}
-            >
-              Drag Marker to Position
-            </button>
-          </div>
-
-          <p>Click on the map or drag the marker to set the event location</p>
-
-          <MapContainer
-            center={mapCenter}
-            zoom={6}
-            style={{ height: '400px', marginBottom: '20px' }}
-            whenCreated={(map) => {
-              mapRef.current = map;
-            }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            {markerPosition && (
-              <Marker 
-                position={markerPosition}
-                draggable={isDraggingMarker}
-                eventHandlers={{
-                  dragend: handleMarkerDragEnd,
-                  click: () => {}
-                }}
-                ref={markerRef}
-              >
-                <Popup>Event location. {isDraggingMarker ? 'Drag me to reposition' : 'Click and drag to move'}</Popup>
-              </Marker>
-            )}
-          </MapContainer>
-
-          {markerPosition && (
-            <p className="coordinates-display">
-              Selected coordinates: {markerPosition[0].toFixed(6)}, {markerPosition[1].toFixed(6)}
-            </p>
-          )}
-        </div>
-
         <form onSubmit={handleSubmit} encType="multipart/form-data">
-          <div className="form-group">
-            <label htmlFor="title">Event Title *</label>
-            <input
-              type="text"
-              id="title"
-              name="title"
-              value={eventData.title}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <div className="label-with-action" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label htmlFor="description">Description *</label>
-              <button
-                type="button"
-                className="btn-text"
-                style={{ background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', fontWeight: 'bold' }}
-                onClick={() => setShowAiGenerator(!showAiGenerator)}
-              >
-                {showAiGenerator ? 'Cancel AI Generation' : '✨ Auto-Generate with AI'}
-              </button>
-            </div>
-
-            {showAiGenerator && (
-              <div className="ai-generator-panel" style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e9ecef' }}>
-                <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '10px' }}>
-                  Answer a few questions to generate a description.
-                </p>
-                <div className="form-group" style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '0.85rem', color: '#444' }}>Event Type *</label>
-                  <input
-                    type="text"
-                    name="type"
-                    value={aiGenData.type}
-                    onChange={handleAiChange}
-                    placeholder="e.g. Technology Conference, Music Festival"
-                    style={{ fontSize: '0.9rem', padding: '8px' }}
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '0.85rem', color: '#444' }}>Target Audience</label>
-                  <input
-                    type="text"
-                    name="audience"
-                    value={aiGenData.audience}
-                    onChange={handleAiChange}
-                    placeholder="e.g. Developers, Students, Families"
-                    style={{ fontSize: '0.9rem', padding: '8px' }}
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '0.85rem', color: '#444' }}>Key Highlights</label>
-                  <textarea
-                    name="highlights"
-                    value={aiGenData.highlights}
-                    onChange={handleAiChange}
-                    placeholder="e.g. Keynote speakers, Live demos, Free food"
-                    rows="2"
-                    style={{ fontSize: '0.9rem', padding: '8px' }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ width: '100%', padding: '8px', fontSize: '0.9rem' }}
-                  onClick={generateDescription}
-                  disabled={aiLoading}
-                >
-                  {aiLoading ? 'Generating...' : 'Generate Description'}
-                </button>
+          {/* Step 1: Basic Info */}
+          {currentStep === 1 && (
+            <div className="wizard-step animate-fade-in">
+              <h3>Basic Information</h3>
+              
+              <div className="form-group">
+                <label htmlFor="title">Event Title *</label>
+                <input
+                  type="text"
+                  id="title"
+                  name="title"
+                  value={eventData.title}
+                  onChange={handleChange}
+                  placeholder="Enter your event name"
+                  required
+                  autoFocus
+                />
               </div>
-            )}
-            <textarea
-              id="description"
-              name="description"
-              value={eventData.description}
-              onChange={handleChange}
-              rows="4"
-              required
-            />
-          </div>
 
-          <div className="form-group">
-            <label htmlFor="location">Location *</label>
-            <input
-              type="text"
-              id="location"
-              name="location"
-              value={eventData.location}
-              onChange={handleChange}
-              placeholder="e.g., Central Park, Conference Hall, etc."
-              required
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="latitude">Latitude *</label>
-              <input
-                type="number"
-                id="latitude"
-                name="latitude"
-                value={eventData.latitude}
-                onChange={handleChange}
-                step="any"
-                placeholder="Click on map or drag marker"
-                required
-                readOnly={!useCurrentLocation}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="longitude">Longitude *</label>
-              <input
-                type="number"
-                id="longitude"
-                name="longitude"
-                value={eventData.longitude}
-                onChange={handleChange}
-                step="any"
-                placeholder="Click on map or drag marker"
-                required
-                readOnly={!useCurrentLocation}
-              />
-            </div>
-          </div>
-
-          {/* Photo Upload Section */}
-          <div className="form-group">
-            <label htmlFor="photos">Event Photos</label>
-            <input
-              type="file"
-              id="photos"
-              name="photos"
-              onChange={handlePhotoChange}
-              accept="image/*"
-              multiple
-            />
-            {eventData.photos.length > 0 && (
-              <div className="photo-preview">
-                <h4>Selected Photos ({eventData.photos.length})</h4>
-                <div className="photo-list">
-                  {eventData.photos.map((photo, index) => (
-                    <div key={index} className="photo-item">
-                      <span>{photo.name}</span>
-                      <button 
-                        type="button" 
-                        className="btn-remove-photo"
-                        onClick={() => removePhoto(index)}
-                      >
-                        ×
-                      </button>
+              <div className="form-group">
+                <label htmlFor="category">Category *</label>
+                <div className="category-grid">
+                  {[
+                    { value: 'music', label: 'Music', emoji: '🎵' },
+                    { value: 'sports', label: 'Sports', emoji: '⚽' },
+                    { value: 'workshop', label: 'Workshop', emoji: '🔧' },
+                    { value: 'exhibition', label: 'Exhibition', emoji: '🎨' },
+                    { value: 'college-fest', label: 'College Fest', emoji: '🎓' },
+                    { value: 'religious', label: 'Religious', emoji: '🕉️' },
+                    { value: 'promotion', label: 'Promotion', emoji: '📢' },
+                    { value: 'other', label: 'Other', emoji: '🎪' }
+                  ].map(cat => (
+                    <div
+                      key={cat.value}
+                      className={`category-card ${
+                        eventData.category === cat.value ? 'selected' : ''
+                      }`}
+                      onClick={() => setEventData(prev => ({ ...prev, category: cat.value }))}
+                    >
+                      <span className="category-emoji">{cat.emoji}</span>
+                      <span className="category-label">{cat.label}</span>
                     </div>
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Step 2: Description */}
+          {currentStep === 2 && (
+            <div className="wizard-step animate-fade-in">
+              <h3>Event Description</h3>
+              
+              <div className="form-group">
+                <div className="label-with-action">
+                  <label htmlFor="description">Description *</label>
+                  <button
+                    type="button"
+                    className="btn-ai"
+                    onClick={() => setShowAiGenerator(!showAiGenerator)}
+                  >
+                    {showAiGenerator ? 'Cancel' : '✨ AI Generate'}
+                  </button>
+                </div>
+
+                {showAiGenerator && (
+                  <div className="ai-generator-panel">
+                    <p className="ai-hint">Answer a few questions to generate a description</p>
+                    <div className="form-group">
+                      <label>Event Type *</label>
+                      <input
+                        type="text"
+                        name="type"
+                        value={aiGenData.type}
+                        onChange={handleAiChange}
+                        placeholder="e.g. Technology Conference, Music Festival"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Target Audience</label>
+                      <input
+                        type="text"
+                        name="audience"
+                        value={aiGenData.audience}
+                        onChange={handleAiChange}
+                        placeholder="e.g. Developers, Students, Families"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Key Highlights</label>
+                      <textarea
+                        name="highlights"
+                        value={aiGenData.highlights}
+                        onChange={handleAiChange}
+                        placeholder="e.g. Keynote speakers, Live demos, Free food"
+                        rows="2"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={generateDescription}
+                      disabled={aiLoading}
+                    >
+                      {aiLoading ? 'Generating...' : 'Generate Description'}
+                    </button>
+                  </div>
+                )}
+                
+                <textarea
+                  id="description"
+                  name="description"
+                  value={eventData.description}
+                  onChange={handleChange}
+                  rows="6"
+                  placeholder="Describe your event in detail..."
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Location */}
+          {currentStep === 3 && (
+            <div className="wizard-step animate-fade-in">
+              <h3>Event Location</h3>
+              
+              <div className="form-group">
+                <label htmlFor="location">Location Name *</label>
+                <input
+                  type="text"
+                  id="location"
+                  name="location"
+                  value={eventData.location}
+                  onChange={handleChange}
+                  placeholder="e.g., Central Park, Conference Hall"
+                  required
+                />
+              </div>
+          
+              <div className="location-options">
+                <div className="toggle-option">
+                  <label className="switch">
+                    <input
+                      type="checkbox"
+                      checked={useCurrentLocation}
+                      onChange={toggleUseCurrentLocation}
+                    />
+                    <span className="slider round"></span>
+                  </label>
+                  <span className="toggle-label">
+                    {useCurrentLocation ? 'Using Current Location' : 'Set Manual Location'}
+                  </span>
+                </div>
+              </div>
+
+              <p className="map-hint">Click on the map or drag the marker to set location</p>
+
+              <MapContainer
+                center={mapCenter}
+                zoom={6}
+                style={{ height: '350px', marginBottom: '20px' }}
+                whenCreated={(map) => { mapRef.current = map; }}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {markerPosition && (
+                  <Marker 
+                    position={markerPosition}
+                    draggable={true}
+                    eventHandlers={{
+                      dragend: handleMarkerDragEnd,
+                      click: () => {}
+                    }}
+                    ref={markerRef}
+                  >
+                    <Popup>Drag me to reposition</Popup>
+                  </Marker>
+                )}
+              </MapContainer>
+
+              {markerPosition && (
+                <p className="coordinates-display">
+                  📍 {markerPosition[0].toFixed(6)}, {markerPosition[1].toFixed(6)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Step 4: Date & Details */}
+          {currentStep === 4 && (
+            <div className="wizard-step animate-fade-in">
+              <h3>Date & Details</h3>
+              
+              <div className="form-group">
+                <label htmlFor="date">Start Date & Time *</label>
+                <input
+                  type="datetime-local"
+                  id="date"
+                  name="date"
+                  value={eventData.date}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="endDate">End Date & Time</label>
+                <input
+                  type="datetime-local"
+                  id="endDate"
+                  name="endDate"
+                  value={eventData.endDate}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="photos">Event Photos</label>
+                <input
+                  type="file"
+                  id="photos"
+                  name="photos"
+                  onChange={handlePhotoChange}
+                  accept="image/*"
+                  multiple
+                />
+                {eventData.photos.length > 0 && (
+                  <div className="photo-preview">
+                    <h4>Selected Photos ({eventData.photos.length})</h4>
+                    <div className="photo-list">
+                      {eventData.photos.map((photo, index) => (
+                        <div key={index} className="photo-item">
+                          <span>{photo.name}</span>
+                          <button 
+                            type="button" 
+                            className="btn-remove-photo"
+                            onClick={() => removePhoto(index)}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Buttons */}
+          <div className="wizard-navigation">
+            {currentStep > 1 && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={prevStep}
+              >
+                ← Previous
+              </button>
+            )}
+            
+            <div className="step-indicator-text">
+              Step {currentStep} of {totalSteps}
+            </div>
+            
+            {currentStep < totalSteps ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={nextStep}
+              >
+                Next →
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+              >
+                {loading ? 'Creating...' : '✨ Create Event'}
+              </button>
             )}
           </div>
-
-          <div className="form-group">
-            <label htmlFor="date">Start Date & Time *</label>
-            <input
-              type="datetime-local"
-              id="date"
-              name="date"
-              value={eventData.date}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="endDate">End Date & Time</label>
-            <input
-              type="datetime-local"
-              id="endDate"
-              name="endDate"
-              value={eventData.endDate}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="category">Category</label>
-            <select
-              id="category"
-              name="category"
-              value={eventData.category}
-              onChange={handleChange}
-            >
-              <option value="other">Other</option>
-              <option value="music">Music</option>
-              <option value="sports">Sports</option>
-              <option value="workshop">Workshop</option>
-              <option value="exhibition">Exhibition</option>
-              <option value="college fest">College Fest</option>
-              <option value="religious">Religious</option>
-              <option value="promotion">Promotion</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary btn-block"
-            disabled={loading}
-          >
-            {loading ? 'Creating Event...' : 'Create Event'}
-          </button>
         </form>
       </div>
     </div>

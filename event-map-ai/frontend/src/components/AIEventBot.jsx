@@ -1,19 +1,91 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import contextAwareAI from '../api/contextAwareAI';
 import './AIEventBot.css';
 
-const AIEventBot = ({ events = [] }) => {
+const AIEventBot = ({ events = [], userLocation = null, filters = {}, onFilterChange = null }) => {
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const sessionIdRef = useRef(`session-${Date.now()}`);
   const [messages, setMessages] = useState([
     {
       id: 1,
-      text: "Hi! I'm your Event Assistant. I can help you find information about events, answer questions, and provide recommendations. What would you like to know?",
+      text: "Hi! I'm your intelligent Event Assistant with full knowledge of this platform. I can help you find events, navigate the app, answer questions about features, and provide personalized recommendations based on your location and preferences. What would you like to know? 🎉",
       sender: 'bot',
-      timestamp: new Date()
+      timestamp: new Date(),
+      suggestions: []
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Initialize AI context when component mounts or context changes
+  useEffect(() => {
+    contextAwareAI.initializeContext(sessionIdRef.current, {
+      user: currentUser,
+      location: userLocation,
+      events: events,
+      filters: filters,
+      currentPage: window.location.pathname
+    });
+  }, [currentUser, userLocation, events, filters]);
+
+  // Update greeting message based on user context
+  useEffect(() => {
+    if (messages.length === 1) {
+      const greeting = generateContextualGreeting();
+      setMessages([{
+        id: 1,
+        text: greeting.text,
+        sender: 'bot',
+        timestamp: new Date(),
+        suggestions: greeting.suggestions
+      }]);
+    }
+  }, [currentUser]);
+
+  const generateContextualGreeting = () => {
+    const userName = currentUser?.name || 'there';
+    const role = currentUser?.role || 'guest';
+    
+    let text = `Hello ${userName}! 👋\n\n`;
+    let suggestions = [];
+    
+    if (role === 'organizer') {
+      text += "As an event organizer, I can help you:\n• Create and manage your events\n• Discover what's happening around you\n• Track RSVPs and engagement\n• Navigate all platform features\n\nWhat would you like to do?";
+      suggestions = [
+        "How do I create an event?",
+        "Show me my organized events",
+        "What's happening this weekend?"
+      ];
+    } else if (role === 'admin') {
+      text += "Welcome, Admin! I can assist you with:\n• Event moderation and approval\n• User management\n• Platform analytics\n• All user and organizer features\n\nHow can I help you today?";
+      suggestions = [
+        "Show pending events",
+        "How do I moderate events?",
+        "Find events near me"
+      ];
+    } else if (role === 'user') {
+      text += "I'm here to help you discover amazing events! I can:\n• Find events based on your interests\n• Give you directions to events\n• Help you RSVP and manage attendance\n• Answer questions about the platform\n\nWhat are you interested in?";
+      suggestions = [
+        "Show me events near me",
+        "Find music events this weekend",
+        "How do I become an organizer?"
+      ];
+    } else {
+      text += "I'm your intelligent Event Assistant! I can help you:\n• 🔍 Discover events near you\n• 📍 Navigate the platform\n• ❓ Answer questions about features\n• 🎯 Get personalized recommendations\n\nCreate an account to unlock more features!";
+      suggestions = [
+        "Find events near me",
+        "How do I create an account?",
+        "What can I do on this platform?"
+      ];
+    }
+    
+    return { text, suggestions };
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -32,31 +104,129 @@ const AIEventBot = ({ events = [] }) => {
     });
   };
 
-  // AI Response Generator using backend RAG system
+  // Enhanced AI Response Generator using context-aware AI service
   const generateResponse = async (userMessage) => {
     try {
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          sessionId: 'user-session-' + Date.now()
-        })
+      // Update context before processing
+      contextAwareAI.updateContext(sessionIdRef.current, {
+        user: currentUser,
+        location: userLocation,
+        events: events,
+        filters: filters,
+        currentPage: window.location.pathname
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        return data.response;
-      } else {
-        // Fallback to local processing
-        return generateLocalResponse(userMessage);
+      // Process message with context-aware AI
+      const response = await contextAwareAI.processMessage(
+        sessionIdRef.current,
+        userMessage,
+        null // Context already initialized
+      );
+
+      // Handle actions
+      if (response.actions && response.actions.length > 0) {
+        handleAIActions(response.actions);
       }
+
+      return {
+        text: response.text,
+        suggestions: response.suggestions || []
+      };
     } catch (error) {
-      console.error('Error calling AI API:', error);
+      console.error('Error calling context-aware AI:', error);
       // Fallback to local processing
-      return generateLocalResponse(userMessage);
+      return {
+        text: generateLocalResponse(userMessage),
+        suggestions: []
+      };
+    }
+  };
+
+  // Handle AI-generated actions
+  const handleAIActions = (actions) => {
+    actions.forEach(action => {
+      switch (action.type) {
+        case 'NAVIGATE':
+          handleNavigation(action.target);
+          break;
+        case 'APPLY_FILTER':
+          handleFilterApplication(action.data);
+          break;
+        case 'EXECUTE':
+          handleActionExecution(action.command, action.data);
+          break;
+        default:
+          console.log('Unknown action type:', action.type);
+      }
+    });
+  };
+
+  // Navigation handler
+  const handleNavigation = (target) => {
+    const routes = {
+      'CREATE_EVENT': '/create-event',
+      'PROFILE': '/profile',
+      'LOGIN': '/login',
+      'REGISTER': '/register',
+      'MAP': '/'
+    };
+
+    if (routes[target]) {
+      setTimeout(() => {
+        navigate(routes[target]);
+        setIsOpen(false);
+      }, 1000);
+    }
+  };
+
+  // Filter application handler
+  const handleFilterApplication = (filterData) => {
+    if (onFilterChange && filterData) {
+      const newFilters = { ...filters };
+      
+      if (filterData.category) {
+        newFilters.categories = [filterData.category];
+      }
+      if (filterData.distance) {
+        newFilters.distance = filterData.distance;
+      }
+      if (filterData.dateRange) {
+        // Convert dateRange string to actual dates
+        const today = new Date();
+        switch (filterData.dateRange) {
+          case 'today':
+            newFilters.dateRange = { start: today, end: today };
+            break;
+          case 'weekend':
+            // Implementation for weekend
+            break;
+          default:
+            break;
+        }
+      }
+      
+      onFilterChange(newFilters);
+    }
+  };
+
+  // Action execution handler
+  const handleActionExecution = (command, data) => {
+    switch (command) {
+      case 'CLEAR_FILTER':
+        if (onFilterChange) {
+          onFilterChange({
+            categories: [],
+            dateRange: { start: null, end: null },
+            distance: 10,
+            priceRange: { min: 0, max: 1000, free: false },
+            timeSlots: [],
+            status: ['upcoming'],
+            attendeeRange: { min: 0, max: 1000 }
+          });
+        }
+        break;
+      default:
+        console.log('Unknown command:', command);
     }
   };
 
@@ -75,7 +245,11 @@ const AIEventBot = ({ events = [] }) => {
         const eventList = relevantEvents.slice(0, 3).map(event => 
           `• **${event.title}** - ${event.location} (${new Date(event.date).toLocaleDateString()})`
         ).join('\n');
-        return `I found ${relevantEvents.length} relevant events:\n\n${eventList}\n\nWould you like more details about any of these?`;
+        return `I found ${relevantEvents.length} relevant events:
+
+${eventList}
+
+Would you like more details about any of these?`;
       } else {
         return "I couldn't find any events matching your criteria. Try searching with different keywords like location, date, or event type.";
       }
@@ -140,19 +314,30 @@ Try asking something like "Find music events this weekend" or "What events are n
     setInputMessage('');
     setIsTyping(true);
 
-    // Simulate AI processing delay
+    // Simulate AI processing delay for better UX
     setTimeout(async () => {
       const response = await generateResponse(inputMessage);
       const botMessage = {
         id: Date.now() + 1,
-        text: response,
+        text: response.text,
         sender: 'bot',
-        timestamp: new Date()
+        timestamp: new Date(),
+        suggestions: response.suggestions || []
       };
       
       setMessages(prev => [...prev, botMessage]);
       setIsTyping(false);
-    }, 1000);
+    }, 800);
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setInputMessage(suggestion);
+    // Auto-send after a short delay
+    setTimeout(() => {
+      const inputEvent = { target: { value: suggestion } };
+      setInputMessage(suggestion);
+      setTimeout(() => handleSendMessage(), 100);
+    }, 200);
   };
 
   const handleKeyPress = (e) => {
@@ -193,29 +378,71 @@ Try asking something like "Find music events this weekend" or "What events are n
 
         <div className="chat-messages">
           {messages.map((message) => (
-            <div 
-              key={message.id} 
-              className={`message ${message.sender}`}
-            >
-              <div className="message-content">
-                {message.text.split('\n').map((line, index) => (
-                  <div key={index}>
-                    {line.includes('**') ? (
-                      <span dangerouslySetInnerHTML={{
-                        __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                      }} />
-                    ) : (
-                      line
-                    )}
+            <div key={message.id}>
+              <div className={`message ${message.sender}`}>
+                <div className="message-content">
+                  {message.text.split('\n').map((line, index) => (
+                    <div key={index}>
+                      {line.includes('**') ? (
+                        <span dangerouslySetInnerHTML={{
+                          __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        }} />
+                      ) : (
+                        line
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Event Cards (if present in message) */}
+                {message.eventCards && message.eventCards.length > 0 && (
+                  <div className="event-cards-container">
+                    {message.eventCards.map((event, idx) => (
+                      <div key={idx} className="event-card-mini">
+                        <div className="event-card-header">
+                          <span className="event-category-badge">{event.category}</span>
+                          <span className="event-distance">{event.distance}km</span>
+                        </div>
+                        <h4 className="event-card-title">{event.title}</h4>
+                        <div className="event-card-meta">
+                          <span>📅 {new Date(event.date).toLocaleDateString()}</span>
+                          <span>📍 {event.location}</span>
+                        </div>
+                        <div className="event-card-actions">
+                          <button 
+                            className="event-card-btn primary"
+                            onClick={() => window.location.href = `/event/${event.id}`}
+                          >
+                            View Details
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
+                
+                <div className="message-time">
+                  {message.timestamp.toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </div>
               </div>
-              <div className="message-time">
-                {message.timestamp.toLocaleTimeString([], { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
-              </div>
+              
+              {/* Suggestions */}
+              {message.sender === 'bot' && message.suggestions && message.suggestions.length > 0 && (
+                <div className="message-suggestions">
+                  {message.suggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      className="suggestion-chip"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           
