@@ -9,7 +9,7 @@ import UserProfile from './components/UserProfile';
 import CreateEvent from './components/CreateEvent';
 import Navigation from './components/Navigation';
 import AIEventBot from './components/AIEventBot';
-import { ToastContainer, useToast } from './components/Toast';
+import Toast, { ToastContainer, useToast } from './components/Toast.jsx';
 import AuthProvider from './context/AuthContext';
 import './styles/theme.css';
 import './App.css';
