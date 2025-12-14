@@ -35,11 +35,18 @@ export default function Navigation() {
               </li>
               
               {(currentUser.role === 'organizer' || currentUser.role === 'admin') && (
-                <li className="nav-item">
-                  <Link to="/create-event" className="nav-link">
-                    Create Event
-                  </Link>
-                </li>
+                <>
+                  <li className="nav-item">
+                    <Link to="/create-event" className="nav-link">
+                      Create Event
+                    </Link>
+                  </li>
+                  <li className="nav-item">
+                    <Link to="/image-analyzer" className="nav-link">
+                      Image Analyzer
+                    </Link>
+                  </li>
+                </>
               )}
               
               <li className="nav-item">

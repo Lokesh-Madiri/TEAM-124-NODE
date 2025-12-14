@@ -7,6 +7,7 @@ import SocialCallback from './components/SocialCallback';
 import EventDetails from './components/EventDetails';
 import UserProfile from './components/UserProfile';
 import CreateEvent from './components/CreateEvent';
+import ImageAnalyzer from './components/ImageAnalyzer';
 import Navigation from './components/Navigation';
 import AIEventBot from './components/AIEventBot';
 import AIAssistantWidget from './components/AIAssistantWidget';
@@ -94,6 +95,7 @@ function AppContent() {
           <Route path="/event/:id" element={<EventDetails />} />
           <Route path="/profile" element={<UserProfile />} />
           <Route path="/create-event" element={<CreateEvent />} />
+          <Route path="/image-analyzer" element={<ImageAnalyzer />} />
         </Routes>
 
         {/* AI Event Bot - Available on all pages */}
