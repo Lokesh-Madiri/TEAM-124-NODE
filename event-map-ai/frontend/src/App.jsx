@@ -7,18 +7,21 @@ import SocialCallback from './components/SocialCallback';
 import EventDetails from './components/EventDetails';
 import UserProfile from './components/UserProfile';
 import CreateEvent from './components/CreateEvent';
+import ImageAnalyzer from './components/ImageAnalyzer';
 import Navigation from './components/Navigation';
 import AIEventBot from './components/AIEventBot';
 import Toast, { ToastContainer, useToast } from './components/Toast.jsx';
-import AuthProvider from './context/AuthContext';
+import AIAssistantWidget from './components/AIAssistantWidget';
+import AuthProvider, { useAuth } from './context/AuthContext';
 import './styles/theme.css';
 import './App.css';
 
-function App() {
+function AppContent() {
   const [events, setEvents] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [filters, setFilters] = useState({});
   const { toasts, toast, removeToast } = useToast();
+  const { currentUser } = useAuth();
 
   // Get user location
   useEffect(() => {
@@ -104,32 +107,42 @@ function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <Router>
-        <div className="App">
-          <Navigation />
-          <Routes>
-            <Route path="/" element={<MapView />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/auth/social" element={<SocialCallback />} />
-            <Route path="/event/:id" element={<EventDetails />} />
-            <Route path="/profile" element={<UserProfile />} />
-            <Route path="/create-event" element={<CreateEvent />} />
-          </Routes>
+    <Router>
+      <div className="App">
+        <Navigation />
+        <Routes>
+          <Route path="/" element={<MapView />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/auth/social" element={<SocialCallback />} />
+          <Route path="/event/:id" element={<EventDetails />} />
+          <Route path="/profile" element={<UserProfile />} />
+          <Route path="/create-event" element={<CreateEvent />} />
+          <Route path="/image-analyzer" element={<ImageAnalyzer />} />
+        </Routes>
 
-          {/* AI Event Bot - Available on all pages with full context */}
-          <AIEventBot 
-            events={events} 
-            userLocation={userLocation}
-            filters={filters}
-            onFilterChange={setFilters}
-          />
-          
-          {/* Toast Notifications */}
-          <ToastContainer toasts={toasts} removeToast={removeToast} />
-        </div>
-      </Router>
+        {/* AI Event Bot - Available on all pages with full context */}
+        <AIEventBot 
+          events={events} 
+          userLocation={userLocation}
+          filters={filters}
+          onFilterChange={setFilters}
+        />
+        
+        {/* NEW: Multi-Agent AI Assistant Widget */}
+        <AIAssistantWidget user={currentUser} />
+        
+        {/* Toast Notifications */}
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+      </div>
+    </Router>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
     </AuthProvider>
   );
 }

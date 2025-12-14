@@ -10,12 +10,15 @@
     "test-ai": "node src/utils/testAI.js",
     "fix-coordinates": "node utils/fixMissingCoordinates.js",
     "migrate": "node utils/dataMigration.js",
+    "insert-sample": "node utils/insertSampleEvents.js",
+    "insert-local": "node utils/insertLocalEvents.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.3",
     "chromadb": "^3.1.7",

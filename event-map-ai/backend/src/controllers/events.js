@@ -72,6 +72,7 @@ function getStaticEvents() {
 
 exports.getEvents = async (req, res) => {
   try {
+    console.log("=== EVENTS CONTROLLER ===");
     let {
       latitude,
       longitude,
@@ -81,37 +82,23 @@ exports.getEvents = async (req, res) => {
       endDate,
     } = req.query;
 
-    // If database is not available, return static events
-    if (!isDatabaseAvailable) {
-      console.log("Returning static events as database is not available");
-      let events = getStaticEvents();
+    console.log("Request query parameters:", {
+      latitude,
+      longitude,
+      radius,
+      category,
+      startDate,
+      endDate,
+    });
 
-      // Filter events based on parameters if provided
-      if (category && category !== "all") {
-        events = events.filter((event) => event.category === category);
-      }
+    console.log("Fetching events from database with params:", {
+      latitude,
+      longitude,
+      radius,
+      category,
+    });
 
-      // Transform events for frontend
-      const transformedEvents = events.map((event) => ({
-        _id: event._id,
-        title: event.title,
-        description: event.description,
-        location: event.location,
-        latitude: event.locationCoords.coordinates[1],
-        longitude: event.locationCoords.coordinates[0],
-        date: event.date,
-        endDate: event.endDate,
-        category: event.category,
-        attendees: event.attendees.length,
-        organizer: {
-          id: event.organizer._id,
-          name: event.organizer.name,
-        },
-      }));
-
-      return res.json(transformedEvents);
-    }
-
+    // Always fetch from database - no static fallback
     // Build query for approved events only
     let query = { status: "approved" };
 
@@ -133,6 +120,11 @@ exports.getEvents = async (req, res) => {
 
     // Add geospatial query if coordinates provided
     if (latitude && longitude) {
+      console.log(
+        "Adding geospatial query for coordinates:",
+        latitude,
+        longitude
+      );
       query.locationCoords = {
         $near: {
           $geometry: {
@@ -142,73 +134,59 @@ exports.getEvents = async (req, res) => {
           $maxDistance: parseFloat(radius) * 1000, // Convert km to meters
         },
       };
+    } else {
+      console.log("No coordinates provided, fetching all approved events");
     }
 
     // Execute query
+    console.log("Executing database query:", JSON.stringify(query, null, 2));
     const events = await Event.find(query)
       .populate("organizer", "name email")
       .sort({ date: 1 })
       .limit(100); // Limit to prevent overload
 
+    console.log("Found", events.length, "events in database");
+
     // Transform events for frontend
     const transformedEvents = events.map((event) => ({
-      _id: event._id,
-      title: event.title,
-      description: event.description,
-      location: event.location,
-      latitude: event.locationCoords.coordinates[1],
-      longitude: event.locationCoords.coordinates[0],
-      date: event.date,
-      endDate: event.endDate,
-      category: event.category,
-      attendees: event.attendees.length,
-      organizer: {
-        id: event.organizer._id,
-        name: event.organizer.name,
-      },
+      _id: event._id || null,
+      title: event.title || "Untitled Event",
+      description: event.description || "No description available",
+      location: event.location || "Location not specified",
+      latitude:
+        event.locationCoords && event.locationCoords.coordinates
+          ? event.locationCoords.coordinates[1]
+          : 0,
+      longitude:
+        event.locationCoords && event.locationCoords.coordinates
+          ? event.locationCoords.coordinates[0]
+          : 0,
+      date: event.date || new Date(),
+      endDate: event.endDate || new Date(),
+      category: event.category || "uncategorized",
+      attendees: event.attendees ? event.attendees.length : 0,
+      organizer: event.organizer
+        ? {
+            id: event.organizer._id,
+            name: event.organizer.name,
+          }
+        : {
+            id: null,
+            name: "Unknown Organizer",
+          },
     }));
 
+    console.log("Returning", transformedEvents.length, "transformed events");
     res.json(transformedEvents);
   } catch (error) {
     console.error("Error fetching events:", error);
+    console.error("Error stack:", error.stack);
 
-    // Mark database as unavailable and return static events
-    isDatabaseAvailable = false;
-    console.log("Database error detected, switching to static events mode");
-
-    // Try to return static events as fallback
-    try {
-      const { category } = req.query; // Get category from request query
-      let events = getStaticEvents();
-
-      // Filter events based on parameters if provided
-      if (category && category !== "all") {
-        events = events.filter((event) => event.category === category);
-      }
-
-      // Transform events for frontend
-      const transformedEvents = events.map((event) => ({
-        _id: event._id,
-        title: event.title,
-        description: event.description,
-        location: event.location,
-        latitude: event.locationCoords.coordinates[1],
-        longitude: event.locationCoords.coordinates[0],
-        date: event.date,
-        endDate: event.endDate,
-        category: event.category,
-        attendees: event.attendees.length,
-        organizer: {
-          id: event.organizer._id,
-          name: event.organizer.name,
-        },
-      }));
-
-      res.json(transformedEvents);
-    } catch (staticError) {
-      console.error("Error returning static events:", staticError);
-      res.status(500).json({ message: "Server error" });
-    }
+    // Return error instead of static events
+    res.status(500).json({
+      message: "Failed to fetch events from database",
+      error: error.message,
+    });
   }
 };
 

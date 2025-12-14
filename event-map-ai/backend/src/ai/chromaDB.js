@@ -6,6 +6,18 @@ class ChromaDB {
       baseUrl: process.env.CHROMA_DB_URL || 'http://localhost:8001'
     });
     this.collectionName = 'events';
+    this.collection = null;
+  }
+
+  async initialize() {
+    try {
+      await this.initializeCollection();
+      console.log('✅ ChromaDB initialized successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ ChromaDB initialization failed:', error.message);
+      return false;
+    }
   }
 
   async initializeCollection() {
@@ -152,6 +164,38 @@ class ChromaDB {
       console.error('Error deleting event embedding from ChromaDB:', error.message);
       // Don't throw error, just log it
     }
+  }
+
+  // Alias methods for compatibility with agents
+  async addDocument(id, document, embedding, metadata) {
+    return await this.addEventEmbedding(id, {
+      title: metadata.title || '',
+      description: document || '',
+      category: metadata.category || '',
+      location: metadata.location || '',
+      locationCoords: metadata.locationCoords || null,
+      date: metadata.date || new Date()
+    }, embedding);
+  }
+
+  async searchSimilar(queryEmbedding, limit = 5) {
+    const results = await this.searchSimilarEvents(queryEmbedding, limit);
+    
+    // Transform results to match expected format
+    if (results.ids && results.ids[0] && results.ids[0].length > 0) {
+      return results.ids[0].map((id, index) => ({
+        id,
+        document: results.documents[0][index],
+        metadata: results.metadatas[0][index],
+        score: 1 - (results.distances[0][index] || 0) // Convert distance to similarity score
+      }));
+    }
+    
+    return [];
+  }
+
+  async deleteDocument(id) {
+    return await this.deleteEventEmbedding(id);
   }
 }
 

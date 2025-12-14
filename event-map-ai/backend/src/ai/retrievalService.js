@@ -1,128 +1,128 @@
+/**
+ * RETRIEVAL SERVICE
+ * Handles event data retrieval and context generation for AI
+ */
+
+const Event = require('../models/Event');
 const chromaDB = require('./chromaDB');
 const embeddingService = require('./embeddingService');
-const Event = require('../models/Event');
 
 class RetrievalService {
   constructor() {
-    this.chromaDB = chromaDB;
-    this.embeddingService = embeddingService;
+    this.initialized = false;
   }
 
   async initialize() {
     try {
-      await this.chromaDB.initializeCollection();
-      console.log('Retrieval service initialized');
+      console.log('Initializing Retrieval Service...');
+      
+      // Initialize ChromaDB and embeddings
+      await chromaDB.initialize();
+      
+      // Index existing events
+      await this.indexExistingEvents();
+      
+      this.initialized = true;
+      console.log('✅ Retrieval Service initialized successfully');
     } catch (error) {
-      console.error('Error initializing retrieval service:', error);
-      throw error;
+      console.error('❌ Retrieval Service initialization failed:', error);
+      // Don't throw error - allow system to continue without retrieval
     }
   }
 
-  async searchRelevantEvents(query, limit = 5) {
+  async indexExistingEvents() {
     try {
-      // Generate embedding for the query
-      const queryEmbedding = await this.embeddingService.generateQueryEmbedding(query);
+      const events = await Event.find({ status: 'approved' }).lean();
+      console.log(`Indexing ${events.length} events...`);
       
-      // Search for similar events in ChromaDB
-      const results = await this.chromaDB.searchSimilarEvents(queryEmbedding, limit);
-      
-      // Process and return results
-      // Handle case where results might be empty
-      if (!results.ids || !results.ids[0] || results.ids[0].length === 0) {
-        return [];
+      for (const event of events) {
+        await this.addEventToIndex(event);
       }
       
-      const relevantEvents = results.ids[0].map((id, index) => ({
-        id: id,
-        document: results.documents[0][index],
-        metadata: results.metadatas[0][index],
-        distance: results.distances[0][index]
-      }));
-      
-      return relevantEvents;
+      console.log(`✅ Indexed ${events.length} events`);
     } catch (error) {
-      console.error('Error searching relevant events:', error);
-      throw error;
+      console.error('Error indexing events:', error);
     }
   }
 
   async addEventToIndex(event) {
     try {
-      // Generate embedding for the event
-      const embedding = await this.embeddingService.generateEventEmbedding(event);
+      if (!this.initialized) return;
+
+      const eventText = this.createEventText(event);
+      const embedding = await embeddingService.generateEmbedding(eventText);
       
-      // Add event embedding to ChromaDB
-      await this.chromaDB.addEventEmbedding(event._id.toString(), {
-        title: event.title,
-        description: event.description,
-        category: event.category,
-        location: event.location,
-        locationCoords: event.locationCoords,
-        date: event.date
-      }, embedding);
-      
-      console.log(`Event ${event._id} added to retrieval index`);
+      await chromaDB.addDocument(
+        event._id.toString(),
+        eventText,
+        embedding,
+        {
+          title: event.title,
+          category: event.category,
+          location: event.location,
+          date: event.date,
+          organizer: event.organizer
+        }
+      );
     } catch (error) {
-      console.error('Error adding event to retrieval index:', error);
-      throw error;
+      console.error('Error adding event to index:', error);
+    }
+  }
+
+  async getEventContextForQuery(query) {
+    try {
+      if (!this.initialized) {
+        return this.getFallbackContext(query);
+      }
+
+      const queryEmbedding = await embeddingService.generateEmbedding(query);
+      const similarEvents = await chromaDB.searchSimilar(queryEmbedding, 5);
+      
+      if (similarEvents.length === 0) {
+        return this.getFallbackContext(query);
+      }
+
+      // Create context from similar events
+      const context = similarEvents.map(event => {
+        return `Event: ${event.metadata.title}\nCategory: ${event.metadata.category}\nLocation: ${event.metadata.location}\nDate: ${event.metadata.date}\nDescription: ${event.document.substring(0, 200)}...`;
+      }).join('\n\n');
+
+      return context;
+    } catch (error) {
+      console.error('Error getting event context:', error);
+      return this.getFallbackContext(query);
+    }
+  }
+
+  createEventText(event) {
+    return [
+      event.title,
+      event.description,
+      event.category,
+      event.location,
+      new Date(event.date).toLocaleDateString()
+    ].filter(Boolean).join(' ');
+  }
+
+  getFallbackContext(query) {
+    return `I can help you find events related to "${query}". I have access to various events including technology conferences, music festivals, workshops, and more. Please let me know what specific type of event you're looking for.`;
+  }
+
+  async removeEventFromIndex(eventId) {
+    try {
+      if (!this.initialized) return;
+      await chromaDB.deleteDocument(eventId.toString());
+    } catch (error) {
+      console.error('Error removing event from index:', error);
     }
   }
 
   async updateEventInIndex(event) {
     try {
-      // Generate embedding for the event
-      const embedding = await this.embeddingService.generateEventEmbedding(event);
-      
-      // Update event embedding in ChromaDB
-      await this.chromaDB.updateEventEmbedding(event._id.toString(), {
-        title: event.title,
-        description: event.description,
-        category: event.category,
-        location: event.location,
-        locationCoords: event.locationCoords,
-        date: event.date
-      }, embedding);
-      
-      console.log(`Event ${event._id} updated in retrieval index`);
+      await this.removeEventFromIndex(event._id);
+      await this.addEventToIndex(event);
     } catch (error) {
-      console.error('Error updating event in retrieval index:', error);
-      throw error;
-    }
-  }
-
-  async removeEventFromIndex(eventId) {
-    try {
-      // Remove event embedding from ChromaDB
-      await this.chromaDB.deleteEventEmbedding(eventId);
-      
-      console.log(`Event ${eventId} removed from retrieval index`);
-    } catch (error) {
-      console.error('Error removing event from retrieval index:', error);
-      throw error;
-    }
-  }
-
-  async getEventContextForQuery(query, limit = 3) {
-    try {
-      // Search for relevant events
-      const relevantEvents = await this.searchRelevantEvents(query, limit);
-      
-      // Format context for LLM
-      const context = relevantEvents.map(event => {
-        return `
-        Event: ${event.metadata.title}
-        Description: ${event.metadata.description}
-        Category: ${event.metadata.category}
-        Location: ${event.metadata.location}
-        Date: ${event.metadata.date}
-        Relevance Score: ${1 - (event.distance || 0)}
-        `.trim();
-      }).join('\n\n');
-      
-      return context;
-    } catch (error) {
-      console.error('Error getting event context for query:', error);
-      throw error;
+      console.error('Error updating event in index:', error);
     }
   }
 }

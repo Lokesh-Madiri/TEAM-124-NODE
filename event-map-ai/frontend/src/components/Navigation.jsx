@@ -221,12 +221,20 @@ export default function Navigation() {
               </li>
               
               {(currentUser.role === 'organizer' || currentUser.role === 'admin') && (
-                <li>
-                  <Link to="/create-event" className={`mobile-menu-item ${isActive('/create-event') ? 'active' : ''}`}>
-                    <span className="mobile-menu-icon">➕</span>
-                    Create Event
-                  </Link>
-                </li>
+                <>
+                  <li>
+                    <Link to="/create-event" className={`mobile-menu-item ${isActive('/create-event') ? 'active' : ''}`}>
+                      <span className="mobile-menu-icon">➕</span>
+                      Create Event
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/image-analyzer" className="mobile-menu-item">
+                      <span className="mobile-menu-icon">🖼️</span>
+                      Image Analyzer
+                    </Link>
+                  </li>
+                </>
               )}
               
               {currentUser.role === 'admin' && (

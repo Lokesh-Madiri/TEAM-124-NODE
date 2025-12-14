@@ -346,10 +346,6 @@ export default function MapView() {
     }
   };
 
-  const handleMapClick = (e) => {
-    console.log("Map clicked at:", e.latlng);
-  };
-
   const handleSearchLocation = () => {
     if (!searchQuery.trim()) return;
     
